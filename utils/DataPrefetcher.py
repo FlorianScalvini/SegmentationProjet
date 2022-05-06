@@ -4,7 +4,6 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 
 
-
 class DataPrefetcher(object):
     def __init__(self, loader, device, stop_after=None):
         self.loader = loader

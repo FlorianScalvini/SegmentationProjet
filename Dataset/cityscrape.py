@@ -17,48 +17,37 @@ import glob
 
 import random
 from torch.utils.data import Dataset
-from torchvision import transforms as T
-from torchvision.transforms.functional import hflip, rotate, InterpolationMode
-import numpy as np
-import torch
+from Dataset.Dataset import BaseDataSet
+import PIL.Image as Image
 
-class Cityscapes(Dataset):
-    NUM_CLASSES = 19
-    def __init__(self, transforms, dataset_root, mode='train', edge=False):
-        self.dataset_root = dataset_root
-        self.transforms = Compose(transforms)
+
+class Cityscapes(BaseDataSet):
+    def __init__(self, transforms, root, mode='train', edge=False):
+        super(Cityscapes, self).__init__(root=root, num_classes=19, mode=mode, transforms=transforms)
         self.file_list = list()
         mode = mode.lower()
-        self.mode = mode
-        self.num_classes = self.NUM_CLASSES
         self.ignore_index = 255
         self.edge = edge
 
-        if mode not in ['train', 'val', 'test']:
-            raise ValueError(
-                "mode should be 'train', 'val' or 'test', but got {}.".format(
-                    mode))
+        img_dir = os.path.join(self.root, 'leftImg8bit')
+        label_dir = os.path.join(self.root, 'gtFine')
+        if self.root is None or not os.path.isdir(self.root) or not os.path.isdir(img_dir) \
+                or not os.path.isdir(label_dir):
+            raise ValueError("The dataset is not Found.")
+        self._set_files()
 
-        if self.transforms is None:
-            raise ValueError("`transforms` is necessary, but it is None.")
+    def _set_files(self):
+        assert (self.mode in ['train', 'val'])
+        label_path = os.path.join(self.root, 'gtFine', self.mode)
+        image_path = os.path.join(self.root, 'leftImg8bit', self.mode)
+        assert os.listdir(image_path) == os.listdir(label_path)
 
-        img_dir = os.path.join(self.dataset_root, 'leftImg8bit')
-        label_dir = os.path.join(self.dataset_root, 'gtFine')
-        if self.dataset_root is None or not os.path.isdir(
-                self.dataset_root) or not os.path.isdir(
-                    img_dir) or not os.path.isdir(label_dir):
-            raise ValueError(
-                "The dataset is not Found or the folder structure is nonconfoumance."
-            )
+        image_paths = glob.glob(image_path + '/**/*.png', recursive=True)
+        label_paths = glob.glob(label_path + '/**/*gtFine_labelIds.png', recursive=True)
+        self.files = list(zip(image_paths, label_paths))
 
-        label_files = sorted(
-            glob.glob(
-                os.path.join(label_dir, mode, '*',
-                             '*_gtFine_labelTrainIds.png')))
-        img_files = sorted(
-            glob.glob(os.path.join(img_dir, mode, '*', '*_leftImg8bit.png')))
-
-        self.file_list = [
-            [img_path, label_path]
-            for img_path, label_path in zip(img_files, label_files)
-        ]
+    def _load_data(self, index):
+        image_path, label_path = self.files[index]
+        image = Image.open(image_path).convert('RGB')
+        label = Image.open(label_path)
+        return image, label

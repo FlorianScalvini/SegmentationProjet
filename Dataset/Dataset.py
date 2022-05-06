@@ -7,15 +7,21 @@ import torch
 from transform import Transform
 
 class BaseDataSet(Dataset):
-    def __init__(self, root, split, mode='train', transforms=Transform()):
+    def __init__(self, root, num_classes, mode='train', transforms=Transform()):
+        self.numberClasses = num_classes
         self.root = root
-        self.split = split
-        self.transform = Transform(transforms=transforms)
+        self.transforms = Transform(transforms=transforms)
         self.mode = mode
         self.files = []
         self._set_files()
         self.palette = None
         self.mapping = None
+        if self.mode not in ['train', 'val', 'test']:
+            raise ValueError(
+                "mode should be 'train', 'val' or 'test', but got {}.".format(
+                    self.mode))
+        if self.transforms is None:
+            raise ValueError("`transforms` is necessary, but it is None.")
 
     def _set_files(self):
         raise NotImplementedError
@@ -23,13 +29,12 @@ class BaseDataSet(Dataset):
     def _load_data(self, index):
         raise NotImplementedError
 
-
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, index):
         image, label = self._load_data(index)
-        image, label = self.transform(image, label)
+        image, label = self.transforms(image, label)
         if self.mapping is not None:
             label = self.encode_labels(label)
         return image, label
@@ -40,10 +45,8 @@ class BaseDataSet(Dataset):
             label_mask[mask == k] = self.mapping[k]
         return label_mask
 
-
     def __repr__(self):
         fmt_str = "Dataset: " + self.__class__.__name__ + "\n"
         fmt_str += "    # data: {}\n".format(self.__len__())
-        fmt_str += "    Split: {}\n".format(self.split)
         fmt_str += "    Root: {}".format(self.root)
         return fmt_str
