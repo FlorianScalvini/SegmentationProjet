@@ -81,11 +81,18 @@ class Trainer():
         # SETTING THE DEVICE
         self.device, _ = self._get_available_devices(self.config['n_gpu'])
         self.model.to(self.device)
+        self.scaler = None
+        self.optimizer = torch.optim.Adam()
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
+
+        self.total_loss = 0.
+        self.total_inter, self.total_union = 0, 0
+        self.total_correct, self.total_label = 0, 0
 
         if self.device ==  torch.device('cpu'): prefetch = False
         if precision == 'fp16':
             print('use AMP to train.')
-            scaler = torch.cuda.amp.GradScaler()
+            self.scaler = torch.cuda.amp.GradScaler()
         if prefetch:
             self.train_loader = DataPrefetcher(train_loader, device=self.device)
             self.val_loader = DataPrefetcher(val_loader, device=self.device)
@@ -111,49 +118,31 @@ class Trainer():
         return device, available_gpus
 
     def _train_epoch(self, epoch):
-        self.logger.info('\n')
         self.model.train()
-        self.wrt_mode = 'train'
-        tic = time.time()
         self._reset_metrics()
+        tic = time.time()
         tbar = tqdm(self.train_loader, ncols=130)
         for batch_idx, (data, target) in enumerate(tbar):
+            self.optimizer.zero_grad()
             self.data_time.update(time.time() - tic)
             # data, target = data.to(self.device), target.to(self.device)
-
-            # LOSS & OPTIMIZE
-            self.optimizer.zero_grad()
-            output = self.model(data)
-            loss = loss_computation(logits_list=output, labels=target, loss=self.loss)
-
-
-            if type(output) is tuple:
-                assert output[0].size()[2:] == target.size()[1:]
-                assert output[0].size()[1] == self.num_classes
-                loss = self.loss(output[0], target)
-                for i in range(len(output) - 1):
-                    loss += self.loss(output[i], target)
-                output = output[0]
+            if self.scaler is not None:
+                with torch.cuda.amp.autocast():
+                    output = self.model(data)
+                    loss = loss_computation(logits_list=output, labels=target, loss=self.loss)
+                    loss = loss.sum()
+                self.scaler.scale(loss).backward()
+                self.scaler.step(optimizer=self.optimizer)
+                self.scaler.update()
             else:
-                assert output.size()[2:] == target.size()[1:]
-                assert output.size()[1] == self.num_classes
-                loss = self.loss(output, target)
+                output = self.model(data)
+                loss = loss_computation(logits_list=output, labels=target, loss=self.loss)
+                loss = loss.sum()
+                loss.backward()
+                self.optimizer.step()
 
-
-            loss.backward()
-            self.optimizer.step()
-            self.lr_scheduler.step(epoch=epoch - 1)
-            self.total_loss.update(loss.item())
-
-            # measure elapsed time
-            self.batch_time.update(time.time() - tic)
-            tic = time.time()
-
-            # LOGGING & TENSORBOARD
-            if batch_idx % self.log_step == 0:
-                self.wrt_step = (epoch - 1) * len(self.train_loader) + batch_idx
-                self.writer.add_scalar(f'{self.wrt_mode}/loss', loss.item(), self.wrt_step)
-
+            preds = torch.argmax(output, dim=1,keepdim=True)
+            seg_metrics = eval_metrics(output, target, self.num_classes)
             # FOR EVAL
             seg_metrics = eval_metrics(output, target, self.num_classes)
             self._update_seg_metrics(*seg_metrics)
@@ -165,14 +154,6 @@ class Trainer():
                 pixAcc, mIoU,
                 self.batch_time.average, self.data_time.average))
 
-        # METRICS TO TENSORBOARD
-        seg_metrics = self._get_seg_metrics()
-        for k, v in list(seg_metrics.items())[:-1]:
-            self.writer.add_scalar(f'{self.wrt_mode}/{k}', v, self.wrt_step)
-        for i, opt_group in enumerate(self.optimizer.param_groups):
-            self.writer.add_scalar(f'{self.wrt_mode}/Learning_rate_{i}', opt_group['lr'], self.wrt_step)
-            # self.writer.add_scalar(f'{self.wrt_mode}/Momentum_{k}', opt_group['momentum'], self.wrt_step)
-
         # RETURN LOSS & METRICS
         log = {'loss': self.total_loss.average,
                **seg_metrics}
@@ -182,6 +163,7 @@ class Trainer():
 
     def train(self):
         for epoch in range(self.start_epoch, self.epochs + 1):
+
             results = self._train_epoch(epoch)
             if self.val_loader is not None and epoch % self.config['trainer']['val_per_epochs'] == 0:
                 results = self._valid_epoch(epoch)
@@ -221,8 +203,16 @@ class Trainer():
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=self.improved)
 
+    def _update_seg_metrics(self, correct, labeled, inter, union):
+        self.total_correct += correct
+        self.total_label += labeled
+        self.total_inter += inter
+        self.total_union += union
 
-
+    def _reset_metrics(self):
+        self.total_loss = 0.
+        self.total_inter, self.total_union = 0, 0
+        self.total_correct, self.total_label = 0, 0
 
 
     def _save_checkpoint(self, epoch, save_best=False):
