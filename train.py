@@ -1,6 +1,7 @@
 import argparse
 import random
-
+import time
+from tqdm import *
 import torch.utils.data
 from torch.utils.data import Dataset
 from torchvision import transforms as T
@@ -26,7 +27,8 @@ def parse_args():
     parser.add_argument('--save_dir', dest='save_dir', help='The directory for saving the model snapshot', type=str,
                         default='./output')
     parser.add_argument('--keep_checkpoint_max', dest='keep_checkpoint_max',
-                         help='Maximum number of checkpoints to save', type=int, default=5)
+                         help='Maximum number of checkpoints to save', type=int, default
+                        =5)
     parser.add_argument('--num_workers',dest='num_workers', help='Num workers for data loader',type=int, default=0)
     parser.add_argument('--do_eval', dest='do_eval', help='Eval while training', action='store_true')
     parser.add_argument('--log_iters', dest='log_iters', help='Display logging information at every log_iters',
@@ -48,26 +50,19 @@ def parse_args():
     return parser.parse_args()
 
 
-def loss_computation(logits_list, labels, losses, edges=None):
+
+
+
+def loss_computation(logits_list, labels, loss):
+    loss_coef = loss['coef']
+    lossFunct = loss['coef']
     len_logits = len(logits_list)
-    len_losses = len(losses['types'])
-    if len_logits != len_losses:
-        raise RuntimeError(
-            'The length of logits_list should equal to the types of loss config: {} != {}.'
-            .format(len_logits, len_losses))
+    if len_logits != len(loss_coef):
+        raise ValueError("Different number of logits than loss coef")
     loss_list = []
     for i in range(len(logits_list)):
         logits = logits_list[i]
-        loss_i = losses['types'][i]
-        coef_i = losses['coef'][i]
-        if loss_i.__class__.__name__ == 'MixedLoss':
-            mixed_loss_list = loss_i(logits, labels)
-            for mixed_loss in mixed_loss_list:
-                loss_list.append(coef_i * mixed_loss)
-        elif loss_i.__class__.__name__ in ("KLLoss", ):
-            loss_list.append(coef_i * loss_i(logits_list[0], logits_list[1].detach()))
-        else:
-            loss_list.append(coef_i * loss_i(logits, labels))
+        loss_list.append(lossFunct(logits, labels) * loss_coef[i])
     return loss_list
 
 
@@ -115,9 +110,78 @@ class Trainer():
         available_gpus = list(range(n_gpu))
         return device, available_gpus
 
+    def _train_epoch(self, epoch):
+        self.logger.info('\n')
+        self.model.train()
+        self.wrt_mode = 'train'
+        tic = time.time()
+        self._reset_metrics()
+        tbar = tqdm(self.train_loader, ncols=130)
+        for batch_idx, (data, target) in enumerate(tbar):
+            self.data_time.update(time.time() - tic)
+            # data, target = data.to(self.device), target.to(self.device)
+
+            # LOSS & OPTIMIZE
+            self.optimizer.zero_grad()
+            output = self.model(data)
+            loss = loss_computation(logits_list=output, labels=target, loss=self.loss)
+
+
+            if type(output) is tuple:
+                assert output[0].size()[2:] == target.size()[1:]
+                assert output[0].size()[1] == self.num_classes
+                loss = self.loss(output[0], target)
+                for i in range(len(output) - 1):
+                    loss += self.loss(output[i], target)
+                output = output[0]
+            else:
+                assert output.size()[2:] == target.size()[1:]
+                assert output.size()[1] == self.num_classes
+                loss = self.loss(output, target)
+
+
+            loss.backward()
+            self.optimizer.step()
+            self.lr_scheduler.step(epoch=epoch - 1)
+            self.total_loss.update(loss.item())
+
+            # measure elapsed time
+            self.batch_time.update(time.time() - tic)
+            tic = time.time()
+
+            # LOGGING & TENSORBOARD
+            if batch_idx % self.log_step == 0:
+                self.wrt_step = (epoch - 1) * len(self.train_loader) + batch_idx
+                self.writer.add_scalar(f'{self.wrt_mode}/loss', loss.item(), self.wrt_step)
+
+            # FOR EVAL
+            seg_metrics = eval_metrics(output, target, self.num_classes)
+            self._update_seg_metrics(*seg_metrics)
+            pixAcc, mIoU, _ = self._get_seg_metrics().values()
+
+            # PRINT INFO
+            tbar.set_description('TRAIN ({}) | Loss: {:.3f} | Acc {:.2f} mIoU {:.2f} | B {:.2f} D {:.2f} |'.format(
+                epoch, self.total_loss.average,
+                pixAcc, mIoU,
+                self.batch_time.average, self.data_time.average))
+
+        # METRICS TO TENSORBOARD
+        seg_metrics = self._get_seg_metrics()
+        for k, v in list(seg_metrics.items())[:-1]:
+            self.writer.add_scalar(f'{self.wrt_mode}/{k}', v, self.wrt_step)
+        for i, opt_group in enumerate(self.optimizer.param_groups):
+            self.writer.add_scalar(f'{self.wrt_mode}/Learning_rate_{i}', opt_group['lr'], self.wrt_step)
+            # self.writer.add_scalar(f'{self.wrt_mode}/Momentum_{k}', opt_group['momentum'], self.wrt_step)
+
+        # RETURN LOSS & METRICS
+        log = {'loss': self.total_loss.average,
+               **seg_metrics}
+
+        # if self.lr_scheduler is not None: self.lr_scheduler.step()
+        return log
+
     def train(self):
         for epoch in range(self.start_epoch, self.epochs + 1):
-            # RUN TRAIN (AND VAL)
             results = self._train_epoch(epoch)
             if self.val_loader is not None and epoch % self.config['trainer']['val_per_epochs'] == 0:
                 results = self._valid_epoch(epoch)
@@ -131,7 +195,6 @@ class Trainer():
                 log = {'epoch': epoch, **results}
                 self.train_logger.add_entry(log)
 
-            # CHECKING IF THIS IS THE BEST MODEL (ONLY FOR VAL)
             if self.mnt_mode != 'off' and epoch % self.config['trainer']['val_per_epochs'] == 0:
                 try:
                     if self.mnt_mode == 'min':
@@ -158,9 +221,6 @@ class Trainer():
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=self.improved)
 
-    def _train_epoch(self):
-
-    def _val_epoch(self):
 
 
 
@@ -233,20 +293,8 @@ def train(model,
 
     train_dataset = cityscrape.Cityscapes(root="/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
                                           mode='train', transforms=[Resize((224,244)), Normalize(32,32)])
-    train_dataloader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=2, num_workers=4, drop_last=True)
-
-    if device == torch.device('cpu'): prefetch = False
-    if prefetch:
-        train_loader = DataPrefetcher(train_loader, device=device)
-        val_loader = DataPrefetcher(val_loader, device=device)
-
-    # use amp
-    if precision == 'fp16':
-        logger.info('use AMP to train. AMP level = {}'.format(amp_level))
-        scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
-        if amp_level == 'O2':
-            model, optimizer = paddle.amp.decorate(
-                models=model,
-                optimizers=optimizer,
-                level='O2',
-                save_dtype='float32')
+    val_dataset = cityscrape.Cityscapes(root="/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
+                                          mode='val', transforms=[Resize((224,244)), Normalize(32,32)])
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=2, num_workers=4, drop_last=True)
+    val_loader = torch.utils.data.DataLoader(dataset=val_dataset, batch_size=2, num_workers=4, drop_last=True)
+    Trainer(model=model, loss=loss, config=config, train_logger=train_loader, val_loader=val_loader, prefetch=prefetch, precision=precision)

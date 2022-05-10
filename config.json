@@ -1,0 +1,69 @@
+{
+    "name": "BiSeNetV2",
+    "n_gpu": 1,
+
+    "arch": {
+        "type": "BiSeNetV2",
+        "args": {
+        }
+    },
+
+    "train_loader": {
+        "type": "CityScapes",
+        "args":{
+            "data_dir": "D:\\leftImg8bit_trainvaltest\\",
+            "batch_size": 2,
+            "resize": [224,244],
+            "crop": [32,32],
+            "shuffle": null,
+            "flip": null,
+            "rotate": null,
+            "blur": null,
+            "split": "train",
+            "num_workers": 4
+        }
+    },
+
+    "val_loader": {
+        "type": "CityScapes",
+        "args":{
+            "data_dir": "D:\\leftImg8bit_trainvaltest\\",
+            "batch_size": 2,
+            "resize": [224,244],
+            "crop": [32,32],
+            "val": true,
+            "split": "val",
+            "num_workers": 4
+        }
+    },
+
+    "optimizer": {
+        "type": "SGD",
+        "differential_lr": true,
+        "args":{
+            "lr": 0.01,
+            "weight_decay": 5e-4
+        }
+    },
+
+    "loss": "CrossEntropyLoss2d",
+    "ignore_index": 255,
+    "lr_scheduler": {
+        "type": "Poly",
+        "args": {}
+    },
+
+    "trainer": {
+        "epochs": 80,
+        "save_dir": "saved/",
+        "save_period": 10,
+
+        "monitor": "max Mean_IoU",
+        "early_stop": 10,
+        "tensorboard": true,
+        "log_dir": "saved/runs",
+        "log_per_iter": 20,
+        "val": true,
+        "val_per_epochs": 5
+    }
+}
