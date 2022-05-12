@@ -10,10 +10,12 @@ import numpy as np
 from torch.cuda import amp
 from torch.utils.data import DataLoader
 from Dataset import cityscrape
+from datetime import *
 from transform import *
 from utils.DataPrefetcher import DataPrefetcher
 import os
 import logging
+from val import evaluate
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Model training')
@@ -67,14 +69,21 @@ def loss_computation(logits_list, labels, loss):
 
 
 class Trainer():
-    def __init__(self, model, loss, config, train_loader, val_loader=None, train_logger=None, prefetch=True, precision="fp32"):
+    def __init__(self, model, loss, config, train_loader, val_loader=None, train_logger=None):
+
         self.model = model
         self.loss = loss
+        self.optimizer = torch.optim.Adam()
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
+
         self.config = config
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.train_logger = train_logger
+        self.config = config
         self.start_epoch = 1
+        self.early_stoping = 50
+        self.save_period = 10
         self.improved = False
         self.logger = logging.getLogger(self.__class__.__name__)
         self.epochs = 100
@@ -82,26 +91,25 @@ class Trainer():
         self.device, _ = self._get_available_devices(self.config['n_gpu'])
         self.model.to(self.device)
         self.scaler = None
-        self.optimizer = torch.optim.Adam()
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
-
+        self.save_dir = "./save/" + datetime.now().strftime("%m_%d__%H_%M_%S") + "/"
         self.total_loss = 0.
         self.total_inter, self.total_union = 0, 0
         self.total_correct, self.total_label = 0, 0
 
         if self.device ==  torch.device('cpu'): prefetch = False
-        if precision == 'fp16':
+        self.precision = 'fp32'
+        if self.precision == 'fp16':
             print('use AMP to train.')
             self.scaler = torch.cuda.amp.GradScaler()
-        if prefetch:
-            self.train_loader = DataPrefetcher(train_loader, device=self.device)
-            self.val_loader = DataPrefetcher(val_loader, device=self.device)
         torch.backends.cudnn.benchmark = True
 
         avg_loss = 0.0
         avg_loss_list = []
         best_mean_iou = -1.0
         best_model_iter = -1
+
+    def _parseConfig(self):
+
 
     def _get_available_devices(self, n_gpu):
         sys_gpu = torch.cuda.device_count()
@@ -166,10 +174,9 @@ class Trainer():
 
             results = self._train_epoch(epoch)
             if self.val_loader is not None and epoch % self.config['trainer']['val_per_epochs'] == 0:
-                results = self._valid_epoch(epoch)
-
+                results = evaluate(model=self.model, eval_loader=self.val_loader, num_classes=self.val_loader.numberClasses, precision=self.precision, print_detail=False)
                 # LOGGING INFO
-                self.logger.info(f'\n         ## Info for epoch {epoch} ## ')
+                self.logger.info(f'\n ## Info for epoch {epoch} ## ')
                 for k, v in results.items():
                     self.logger.info(f'         {str(k):15s}: {v}')
 
@@ -184,8 +191,7 @@ class Trainer():
                     else:
                         self.improved = (log[self.mnt_metric] > self.mnt_best)
                 except KeyError:
-                    self.logger.warning(
-                        f'The metrics being tracked ({self.mnt_metric}) has not been calculated. Training stops.')
+                    self.logger.warning(f'The metrics being tracked ({self.mnt_metric}) has not been calculated. Training stops.')
                     break
 
                 if self.improved:
@@ -224,12 +230,12 @@ class Trainer():
             'monitor_best': self.mnt_best,
             'config': self.config
         }
-        filename = os.path.join(self.checkpoint_dir, f'checkpoint-epoch{epoch}.pth')
+        filename = os.path.join(self.save_dir, f'checkpoint-epoch{epoch}.pth')
         self.logger.info(f'\nSaving a checkpoint: {filename} ...')
         torch.save(state, filename)
 
         if save_best:
-            filename = os.path.join(self.checkpoint_dir, f'best_model.pth')
+            filename = os.path.join(self.save_dir, f'best_model.pth')
             torch.save(state, filename)
             self.logger.info("Saving current best: best_model.pth")
 
@@ -287,4 +293,4 @@ def train(model,
                                           mode='val', transforms=[Resize((224,244)), Normalize(32,32)])
     train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=2, num_workers=4, drop_last=True)
     val_loader = torch.utils.data.DataLoader(dataset=val_dataset, batch_size=2, num_workers=4, drop_last=True)
-    Trainer(model=model, loss=loss, config=config, train_logger=train_loader, val_loader=val_loader, prefetch=prefetch, precision=precision)
+    Trainer(model=model, loss=loss, config=config, train_logger=train_loader, val_loader=val_loader, precision=precision)

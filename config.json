@@ -1,7 +1,9 @@
 {
     "name": "BiSeNetV2",
     "n_gpu": 1,
-
+    "train" : false,
+    "val": false,
+    "test": false,
     "arch": {
         "type": "BiSeNetV2",
         "args": {
@@ -10,30 +12,41 @@
 
     "train_loader": {
         "type": "CityScapes",
-        "args":{
-            "data_dir": "D:\\leftImg8bit_trainvaltest\\",
-            "batch_size": 2,
-            "resize": [224,244],
-            "crop": [32,32],
-            "shuffle": null,
+        "data_dir": "D:\\leftImg8bit_trainvaltest\\",
+        "batch_size": 2,
+        "num_workers": 4,
+        "transform":
+            [
+                "Resize",
+                ""
+            ],
+            "Resize": [224,244],
+            "RandomCrop": [32,32],
+            "Rotate": null,
             "flip": null,
-            "rotate": null,
+            "HorizontalFlip": null,
             "blur": null,
-            "split": "train",
-            "num_workers": 4
+            "Normalize":
+            {
+                "mean": [0.3257, 0.3690, 0.3223],
+                "std": [0.2112, 0.2148, 0.2115]
+            }
         }
     },
 
     "val_loader": {
         "type": "CityScapes",
-        "args":{
-            "data_dir": "D:\\leftImg8bit_trainvaltest\\",
-            "batch_size": 2,
-            "resize": [224,244],
-            "crop": [32,32],
-            "val": true,
-            "split": "val",
-            "num_workers": 4
+        "data_dir": "D:\\leftImg8bit_trainvaltest\\",
+        "batch_size": 2,
+        "num_workers": 4,
+        "transform":{
+            "Resize": [224,244],
+            "RandomCrop": [32,32],
+            "Rotate": null,
+            "flip": null,
+            "HorizontalFlip": null,
+            "blur": null,
+            "Normalize": [[0.3257, 0.3690, 0.3223], [0.2112, 0.2148, 0.2115]]
         }
     },
 
@@ -57,7 +70,6 @@
         "epochs": 80,
         "save_dir": "saved/",
         "save_period": 10,
-
         "monitor": "max Mean_IoU",
         "early_stop": 10,
         "tensorboard": true,
