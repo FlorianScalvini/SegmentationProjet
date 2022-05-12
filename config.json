@@ -1,52 +1,50 @@
 {
-    "name": "BiSeNetV2",
+    "name": "STDCSeg",
     "n_gpu": 1,
-    "train" : false,
-    "val": false,
-    "test": false,
     "arch": {
-        "type": "BiSeNetV2",
+        "type": "STDCSeg",
         "args": {
+            "pretrained": null
         }
     },
 
     "train_loader": {
         "type": "CityScapes",
-        "data_dir": "D:\\leftImg8bit_trainvaltest\\",
-        "batch_size": 2,
-        "num_workers": 4,
-        "transform":
-            [
-                "Resize",
-                ""
-            ],
-            "Resize": [224,244],
-            "RandomCrop": [32,32],
-            "Rotate": null,
-            "flip": null,
-            "HorizontalFlip": null,
-            "blur": null,
-            "Normalize":
-            {
-                "mean": [0.3257, 0.3690, 0.3223],
-                "std": [0.2112, 0.2148, 0.2115]
+        "args": {
+            "data_dir": "D:\\leftImg8bit_trainvaltest\\",
+            "batch_size": 2,
+            "num_workers": 4,
+            "transform": {
+                "Resize": [224,244],
+                "RandomCrop": [32,32],
+                "Rotate": null,
+                "flip": false,
+                "HorizontalFlip": null,
+                "blur": null,
+                "Normalize":
+                {
+                    "mean": [0.3257, 0.3690, 0.3223],
+                    "std": [0.2112, 0.2148, 0.2115]
+                }
             }
         }
     },
 
     "val_loader": {
         "type": "CityScapes",
-        "data_dir": "D:\\leftImg8bit_trainvaltest\\",
-        "batch_size": 2,
-        "num_workers": 4,
-        "transform":{
-            "Resize": [224,244],
-            "RandomCrop": [32,32],
-            "Rotate": null,
-            "flip": null,
-            "HorizontalFlip": null,
-            "blur": null,
-            "Normalize": [[0.3257, 0.3690, 0.3223], [0.2112, 0.2148, 0.2115]]
+        "args": {
+            "data_dir": "D:\\leftImg8bit_trainvaltest\\",
+            "batch_size": 2,
+            "num_workers": 4,
+            "transform":{
+                "Resize": [224,244],
+                "RandomCrop": [32,32],
+                "Rotate": null,
+                "flip": null,
+                "HorizontalFlip": null,
+                "blur": null,
+                "Normalize": [[0.3257, 0.3690, 0.3223], [0.2112, 0.2148, 0.2115]]
+            }
         }
     },
 
@@ -58,9 +56,13 @@
             "weight_decay": 5e-4
         }
     },
+    "loss" : {
+        "type": "CrossEntropyLoss2d",
+        "args": {
+            "ignore_index": 255
+        }
+    },
 
-    "loss": "CrossEntropyLoss2d",
-    "ignore_index": 255,
     "lr_scheduler": {
         "type": "Poly",
         "args": {}

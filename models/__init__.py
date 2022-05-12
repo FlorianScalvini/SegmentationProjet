@@ -1,2 +1,2 @@
-from backbone import *
-from module import *
+from models.STDCSeg import *
+from models.ppliteseg import *

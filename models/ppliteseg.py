@@ -1,4 +1,4 @@
-import BaseModel
+import models.BaseModel as BaseModel
 import torch.nn as nn
 import torch.nn.functional
 from models.module import *

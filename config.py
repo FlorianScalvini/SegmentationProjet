@@ -20,18 +20,23 @@ from val import evaluate
 import models
 import transform
 
-def get_instance(module, name, config, *args):
+def get_instance(module, config, *args):
     # GET THE CORRESPONDING CLASS / FCT
-    return getattr(module, config[name]['type'])(*args, **config[name]['args'])
+    return getattr(module, config['type'])(*config['args'])
 
 def _transform(transform_dict):
     transform_list = []
     for key, value in transform_dict:
-        transf = get_instance(transform, key, value)
-        transform_list.append()
-        return
+        if value is None or value == False:
+            transf = getattr(transform, key)()
+        elif isinstance(value, dict):
+            transf = getattr(transform, key)(*value)
+        else:
+            transf = getattr(transform, key)(value)
+        transform_list.append(transf)
+        return transform_list
 
-class Config():
+class ConfigParser():
     def __init__(self, path):
         try:
             self.config = json.load(open(path))
@@ -39,27 +44,34 @@ class Config():
             raise ValueError("Wrong path or config file")
         self.name = self.config['name']
         configModel =  self.config['name']['type']
-        self.models = get_instance(models,self.config['name']['type'], self.config['name']['args'])
-        self.train_loader = None
-        self.val_loader = None
-        self.test_loader = None
-        self.optimizer = None
-        self.transform =
-        if self.config["train"] == True:
-
-        else
-
         return
 
-    def trainer(self):
-        self.transform =
-        self.train_loader = get_instance(Dataset,self.config['train_loader']['type'], self.config['name']['args'])
-        return
+    def model(self):
+        net = getattr(models, self.config['arch']['type'])
+        return net, self.config['arch']['type']
 
-    def validation(self):
-        return
+    def optimizer(self):
+        optim = getattr(torch.optim, self.config['optimizer']['type'])
+        return optim, self.config['optimizer']['type']
 
-    def test(self):
+    def scheduler(self):
+        schl = getattr(torch.optim.lr_scheduler, self.config['lr_scheduler']['type'])
+        return schl, self.config['lr_scheduler']['type']
+
+    def trainLoader(self):
+        args = self.config['train_loader']['args']
+        args['transform'] = _transform(self.config["train_loader"]["transform"])
+        train_loader = getattr(Dataset, self.config['train_loader']['type'])(self.config['name']['args'])
+        return train_loader, args
+
+    def validLoader(self):
+        args = self.config['val_loader']['args']
+        args['transform'] = _transform(self.config["val_loader"]["transform"])
+        val_loader = getattr(Dataset, self.config['val_loader']['type'])(self.config['name']['args'])
+        return val_loader, args
+
+    def
+
 
 
 

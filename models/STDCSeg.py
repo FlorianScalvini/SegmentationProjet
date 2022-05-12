@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional
-from BaseModel import BaseModel
+from models.BaseModel import BaseModel
 from models.module import *
 import models.backbone
 
@@ -24,6 +24,7 @@ class STDCSeg(BaseModel):
         self.conv_out_sp2 = SegHead(32, 64, 1)
         self.pretrained = pretrained
         self.init_weight()
+
 
     def forward(self, x):
         x_size = x.size()[2:]
@@ -126,7 +127,7 @@ class SegHead(nn.Module):
                 if not ly.bias is None: nn.init.constant_(ly.bias, 0)
 
 if __name__ == "__main__":
-    backbone = STDC(num_classes=19)
+    backbone = models.backbone.STDC(num_classes=19)
     net = STDCSeg(backbone=backbone, num_classes=19)
     net.train()
     in_ten = torch.randn(2, 3, 768, 1536)
