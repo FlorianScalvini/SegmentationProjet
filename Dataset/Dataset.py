@@ -8,7 +8,7 @@ from transform import Transform
 
 class BaseDataSet(Dataset):
     def __init__(self, root, num_classes, mode='train', transforms=Transform()):
-        self.numberClasses = num_classes
+        self.num_classes = num_classes
         self.root = root
         self.transforms = Transform(transforms=transforms)
         self.mode = mode

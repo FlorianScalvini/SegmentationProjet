@@ -1,6 +1,11 @@
 {
-    "name": "STDCSeg",
-    "n_gpu": 1,
+    "global": {
+        "name": "Test",
+        "train" : true,
+        "val" :  true,
+        "test" : false,
+        "n_gpu": 1
+    },
     "arch": {
         "type": "STDCSeg",
         "args": {
@@ -9,7 +14,7 @@
     },
 
     "train_loader": {
-        "type": "CityScapes",
+        "type": "Cityscapes",
         "args": {
             "data_dir": "D:\\leftImg8bit_trainvaltest\\",
             "batch_size": 2,
@@ -18,9 +23,8 @@
                 "Resize": [224,244],
                 "RandomCrop": [32,32],
                 "Rotate": null,
-                "flip": false,
                 "HorizontalFlip": null,
-                "blur": null,
+                "Blur": null,
                 "Normalize":
                 {
                     "mean": [0.3257, 0.3690, 0.3223],
@@ -31,7 +35,7 @@
     },
 
     "val_loader": {
-        "type": "CityScapes",
+        "type": "Cityscapes",
         "args": {
             "data_dir": "D:\\leftImg8bit_trainvaltest\\",
             "batch_size": 2,
@@ -40,9 +44,8 @@
                 "Resize": [224,244],
                 "RandomCrop": [32,32],
                 "Rotate": null,
-                "flip": null,
                 "HorizontalFlip": null,
-                "blur": null,
+                "Blur": false,
                 "Normalize": [[0.3257, 0.3690, 0.3223], [0.2112, 0.2148, 0.2115]]
             }
         }
