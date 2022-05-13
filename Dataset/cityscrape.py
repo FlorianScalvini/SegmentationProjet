@@ -22,13 +22,11 @@ import PIL.Image as Image
 
 
 class Cityscapes(BaseDataSet):
-    def __init__(self, transforms, root, mode='train', edge=False):
-        super(Cityscapes, self).__init__(root=root, num_classes=19, mode=mode, transforms=transforms)
+    def __init__(self, transforms, root, split='train', *args):
+        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms)
         self.file_list = list()
-        mode = mode.lower()
+        self.split = split.lower()
         self.ignore_index = 255
-        self.edge = edge
-
         img_dir = os.path.join(self.root, 'leftImg8bit')
         label_dir = os.path.join(self.root, 'gtFine')
         if self.root is None or not os.path.isdir(self.root) or not os.path.isdir(img_dir) \
@@ -37,9 +35,9 @@ class Cityscapes(BaseDataSet):
         self._set_files()
 
     def _set_files(self):
-        assert (self.mode in ['train', 'val'])
-        label_path = os.path.join(self.root, 'gtFine', self.mode)
-        image_path = os.path.join(self.root, 'leftImg8bit', self.mode)
+        assert (self.split in ['train', 'val'])
+        label_path = os.path.join(self.root, 'gtFine', self.split)
+        image_path = os.path.join(self.root, 'leftImg8bit', self.split)
         assert os.listdir(image_path) == os.listdir(label_path)
 
         image_paths = glob.glob(image_path + '/**/*.png', recursive=True)

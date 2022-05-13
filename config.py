@@ -41,6 +41,10 @@ def _transform(transform_dict):
         transform_list.append(transf)
     return transform_list
 
+def parserToFunc(funct, dict_val):
+    return
+
+
 class ConfigParser():
     def __init__(self, path):
         try:
@@ -53,29 +57,31 @@ class ConfigParser():
         self.test =  True if self.config["global"]['test']  else False
         return
 
-    def model(self) -> typing.Tuple[models.BaseModel, dict]:
+    def model(self) -> typing.Tuple[typing.GenericMeta, dict]:
         net = getattr(models, self.config['arch']['type'])
-        return net, self.config['arch']['type']
+        return net, self.config['arch']['args']
 
-    def optimizer(self) -> typing.Tuple[torch.optim.Optimizer, dict]:
+    def optimizer(self) -> typing.Tuple[typing.GenericMeta, dict]:
         optim = getattr(torch.optim, self.config['optimizer']['type'])
-        return optim, self.config['optimizer']['type']
+        return optim, self.config['optimizer']['args']
 
-    def scheduler(self):
+    def scheduler(self) -> typing.Tuple[typing.GenericMeta, dict]:
         schl = getattr(torch.optim.lr_scheduler, self.config['lr_scheduler']['type'])
-        return schl, self.config['lr_scheduler']['type']
+        return schl, self.config['lr_scheduler']['args']
 
-    def trainLoader(self) -> typing.Tuple[Dataset.Dataset, dict]:
-        args = self.config['train_loader']['args']
-        args['transform'] = _transform(args["transform"])
-        train_loader = getattr(Dataset, self.config['train_loader']['type'])
-        return train_loader, args
+    def train_loader(self) -> typing.Tuple[dict, typing.GenericMeta, dict]:
+        loader_config = self.config['train_loader']['args']
+        args_dataset = self.config['train_loader']["dataset"]["args"]
+        args_dataset['transforms'] = _transform(args_dataset["transforms"])
+        train_data = getattr(Dataset, self.config['train_loader']["dataset"]['type'])
+        return loader_config, train_data, args_dataset
 
-    def validLoader(self) -> typing.Tuple[Dataset.Dataset, dict]:
-        args = self.config['val_loader']['args']
-        args['transform'] = _transform(self.config["val_loader"]["transform"])
-        val_loader = getattr(Dataset, self.config['val_loader']['type'])
-        return val_loader, args
+    def val_loader(self) -> typing.Tuple[dict, typing.GenericMeta, dict]:
+        loader_config = self.config['val_loader']['args']
+        args_dataset = self.config['val_loader']["dataset"]["args"]
+        args_dataset['transforms'] = _transform(args_dataset["transforms"])
+        train_data = getattr(Dataset, self.config['val_loader']["dataset"]['type'])
+        return loader_config, train_data, args_dataset
 
     def trainer(self) -> dict:
         return self.config['trainer']

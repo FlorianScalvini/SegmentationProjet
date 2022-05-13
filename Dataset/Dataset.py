@@ -7,19 +7,13 @@ import torch
 from transform import Transform
 
 class BaseDataSet(Dataset):
-    def __init__(self, root, num_classes, mode='train', transforms=Transform()):
+    def __init__(self, root, num_classes, transforms=Transform()):
         self.num_classes = num_classes
         self.root = root
         self.transforms = Transform(transforms=transforms)
-        self.mode = mode
         self.files = []
-        self._set_files()
         self.palette = None
         self.mapping = None
-        if self.mode not in ['train', 'val', 'test']:
-            raise ValueError(
-                "mode should be 'train', 'val' or 'test', but got {}.".format(
-                    self.mode))
         if self.transforms is None:
             raise ValueError("`transforms` is necessary, but it is None.")
 

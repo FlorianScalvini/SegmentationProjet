@@ -9,45 +9,63 @@
     "arch": {
         "type": "STDCSeg",
         "args": {
+            "backbone": "STDC",
             "pretrained": null
         }
     },
 
+
     "train_loader": {
-        "type": "Cityscapes",
-        "args": {
-            "data_dir": "D:\\leftImg8bit_trainvaltest\\",
-            "batch_size": 2,
-            "num_workers": 4,
-            "transform": {
-                "Resize": [224,244],
-                "RandomCrop": [32,32],
-                "Rotate": null,
-                "HorizontalFlip": null,
-                "Blur": null,
-                "Normalize":
-                {
-                    "mean": [0.3257, 0.3690, 0.3223],
-                    "std": [0.2112, 0.2148, 0.2115]
+        "dataset" :
+        {
+            "type": "Cityscapes",
+            "split": "train",
+            "args": {
+                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
+                "transforms": {
+                    "Resize": [224,244],
+                    "RandomCrop": [32,32],
+                    "Rotate": null,
+                    "HorizontalFlip": null,
+                    "Blur": null,
+                    "Normalize":
+                    {
+                        "mean": [0.3257, 0.3690, 0.3223],
+                        "std": [0.2112, 0.2148, 0.2115]
+                    }
                 }
             }
+        },
+        "args": {
+            "batch_size": 2,
+            "num_workers": 4
         }
     },
 
     "val_loader": {
-        "type": "Cityscapes",
-        "args": {
-            "data_dir": "D:\\leftImg8bit_trainvaltest\\",
-            "batch_size": 2,
-            "num_workers": 4,
-            "transform":{
-                "Resize": [224,244],
-                "RandomCrop": [32,32],
-                "Rotate": null,
-                "HorizontalFlip": null,
-                "Blur": false,
-                "Normalize": [[0.3257, 0.3690, 0.3223], [0.2112, 0.2148, 0.2115]]
+        "dataset" :
+        {
+            "type": "Cityscapes",
+            "split": "val",
+            "args": {
+                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
+                "transforms": {
+                    "Resize": [224,244],
+                    "RandomCrop": [32,32],
+                    "Rotate": null,
+                    "HorizontalFlip": null,
+                    "Blur": null,
+                    "Normalize":
+                    {
+                        "mean": [0.3257, 0.3690, 0.3223],
+                        "std": [0.2112, 0.2148, 0.2115]
+                    }
+                }
             }
+        },
+        "args": {
+            "batch_size": 2,
+            "num_workers": 4
         }
     },
 
