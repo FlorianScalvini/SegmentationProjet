@@ -7,7 +7,7 @@ import torch
 
 
 class PPLiteSeg(BaseModel):
-    def __init__(self, num_classes, backbone, backbone_indices=None, arm_type='UAFM_SpAtten',cm_bin_sizes=None, cm_out_ch=128, arm_out_chs=None, seg_head_inter_chs=None, resize_mode='bilinear',pretrained=None):
+    def __init__(self, num_classes, backbone, backbone_indices=None, arm_type='UAFM_SpAtten',cm_bin_sizes=None, cm_out_ch=128, arm_out_chs=None, seg_head_inter_chs=None, resize_mode='bilinear',pretrained=None, *args, **kwargs):
         super(PPLiteSeg, self).__init__(backbone=backbone, num_classes=num_classes, pretrained=pretrained)
         # backbone
         if seg_head_inter_chs is None:

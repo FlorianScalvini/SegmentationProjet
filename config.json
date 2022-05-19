@@ -1,6 +1,6 @@
 {
     "global": {
-        "name": "Test",
+        "device": "Test",
         "train" : true,
         "val" :  true,
         "test" : false,
@@ -8,12 +8,18 @@
     },
     "arch": {
         "type": "STDCSeg",
+        "pretrained": null,
         "args": {
-            "backbone": "STDC",
-            "pretrained": null
+        },
+        "backbone":
+        {
+            "type": "STDC",
+            "args":
+            {
+
+            }
         }
     },
-
 
     "train_loader": {
         "dataset" :
@@ -21,7 +27,7 @@
             "type": "Cityscapes",
             "split": "train",
             "args": {
-                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
+                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest",
                 "transforms": {
                     "Resize": [224,244],
                     "RandomCrop": [32,32],
@@ -41,14 +47,13 @@
             "num_workers": 4
         }
     },
-
     "val_loader": {
         "dataset" :
         {
             "type": "Cityscapes",
             "split": "val",
             "args": {
-                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
+                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest",
                 "transforms": {
                     "Resize": [224,244],
                     "RandomCrop": [32,32],
@@ -77,6 +82,7 @@
             "weight_decay": 5e-4
         }
     },
+
     "loss" : {
         "type": "CrossEntropyLoss2d",
         "args": {
@@ -85,7 +91,7 @@
     },
 
     "lr_scheduler": {
-        "type": "Poly",
+        "type": "ReduceLROnPlateau",
         "args": {}
     },
 

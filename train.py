@@ -16,7 +16,7 @@ from utils.DataPrefetcher import DataPrefetcher
 import os
 import logging
 from val import evaluate
-
+import typing
 
 
 
@@ -35,26 +35,27 @@ def loss_computation(logits_list, labels, loss):
 
 
 class Trainer():
-    def __init__(self, model, loss, config, train_loader, val_loader=None, train_logger=None):
+    def __init__(self, model, loss, optimizer, scheduler, global_config, train_loader, val_loader=None,
+                 train_logger=None, epoch=100, early_stopping=None, devices='cpu', val_per_epochs=10):
 
         self.model = model
         self.loss = loss
-        self.optimizer = torch.optim.Adam()
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer)
-
-        self.config = config
+        self.optimizer = optimizer
+        self.scheduler = scheduler
+        self.global_config = global_config
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.train_logger = train_logger
-        self.config = config
         self.start_epoch = 1
-        self.early_stoping = 50
+        self.early_stoping = early_stopping
+        if val_loader is not None:
+            self.val_per_epochs = val_per_epochs
         self.save_period = 10
         self.improved = False
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.epochs = 100
+        self.epochs = epoch
         # SETTING THE DEVICE
-        self.device, _ = self._get_available_devices(self.config['n_gpu'])
+        self.device, _ = self._get_available_devices(devices)
         self.model.to(self.device)
         self.scaler = None
         self.save_dir = "./save/" + datetime.now().strftime("%m_%d__%H_%M_%S") + "/"
@@ -137,7 +138,7 @@ class Trainer():
         for epoch in range(self.start_epoch, self.epochs + 1):
 
             results = self._train_epoch(epoch)
-            if self.val_loader is not None and epoch % self.config['trainer']['val_per_epochs'] == 0:
+            if self.val_loader is not None and epoch % self.val_per_epochs == 0:
                 results = evaluate(model=self.model, eval_loader=self.val_loader, num_classes=self.val_loader.numberClasses, precision=self.precision, print_detail=False)
                 # LOGGING INFO
                 self.logger.info(f'\n ## Info for epoch {epoch} ## ')
@@ -191,8 +192,7 @@ class Trainer():
             'epoch': epoch,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
-            'monitor_best': self.mnt_best,
-            'config': self.config
+            'monitor_best': self.mnt_best
         }
         filename = os.path.join(self.save_dir, f'checkpoint-epoch{epoch}.pth')
         self.logger.info(f'\nSaving a checkpoint: {filename} ...')
@@ -212,13 +212,7 @@ class Trainer():
         self.start_epoch = checkpoint['epoch'] + 1
         self.mnt_best = checkpoint['monitor_best']
         self.not_improved_count = 0
-
-        if checkpoint['config']['arch'] != self.config['arch']:
-            self.logger.warning({'Warning! Current model is not the same as the one in the checkpoint'})
         self.model.load_state_dict(checkpoint['state_dict'])
-
-        if checkpoint['config']['optimizer']['type'] != self.config['optimizer']['type']:
-            self.logger.warning({'Warning! Current optimizer is not the same as the one in the checkpoint'})
         self.optimizer.load_state_dict(checkpoint['optimizer'])
 
         self.logger.info(f'Checkpoint <{resume_path}> (epoch {self.start_epoch}) was loaded')

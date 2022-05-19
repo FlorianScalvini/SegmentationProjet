@@ -6,8 +6,8 @@ from models.module import *
 
 
 class BisenetV2(BaseModel):
-    def __init__(self, num_classes, pretrained=None, lambd=0.25, align_corners=True):
-        super(BisenetV2, self).__init__(num_classes=num_classes, pretrained=pretrained)
+    def __init__(self, num_classes, pretrained=None, lambd=0.25, align_corners=True, *args, **kwargs):
+        super(BisenetV2, self).__init__(num_classes=num_classes, pretrained=pretrained, backbone=None)
         C1, C2, C3 = 64, 64, 128
         db_channels = (64, 64, 128)
         C1, C3, C4, C5 = int(C1 * lambd), int(C3 * lambd), 64, 128

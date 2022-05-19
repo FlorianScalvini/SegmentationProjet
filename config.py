@@ -17,6 +17,8 @@ from utils.DataPrefetcher import DataPrefetcher
 import os
 import logging
 from val import evaluate
+import inspect
+import utils.loss as loss
 import models
 import transform
 import Dataset
@@ -58,15 +60,32 @@ class ConfigParser():
             self.config = json.load(open(path))
         except:
             raise ValueError("Wrong path or config file")
-        self.name = True if self.config["global"]['name'] else False
-        self.train =  True if self.config["global"]['train']  else False
-        self.val =  True if self.config["global"]['val']  else False
-        self.test =  True if self.config["global"]['test']  else False
+        try:
+            self.train = True if self.config["global"]['train'] else False
+            self.val = True if self.config["global"]['val'] else False
+            self.test = True if self.config["global"]['test'] else False
+        except:
+            raise ValueError("Missing information")
         return
 
-    def model(self) -> typing.Tuple[typing.GenericMeta, dict]:
+
+
+    def model(self) -> typing.Tuple[typing.GenericMeta, dict, typing.GenericMeta, dict]:
         net = getattr(models, self.config['arch']['type'])
-        return net, self.config['arch']['args']
+        if 'backbone' in inspect.getargspec(net.__init__)[0]:
+            try:
+                net_backbone = getattr(models.backbone, self.config['arch']['backbone']['type'])
+                b_kwargs = self.config['arch']['backbone']['args']
+            except:
+                raise ValueError("Missing backbone value or incorrect config.json")
+        else:
+            net_backbone = None
+            b_kwargs = None
+        return net, self.config['arch']['args'], net_backbone,  b_kwargs
+
+    def loss(self) -> typing.Tuple[typing.GenericMeta, dict]:
+        lss = getattr(loss, self.config['loss']['type'])
+        return lss, self.config['loss']['args']
 
     def optimizer(self) -> typing.Tuple[typing.GenericMeta, dict]:
         optim = getattr(torch.optim, self.config['optimizer']['type'])
@@ -90,9 +109,11 @@ class ConfigParser():
         train_data = getattr(Dataset, self.config['val_loader']["dataset"]['type'])
         return loader_config, train_data, args_dataset
 
-    def trainer(self) -> dict:
-        return self.config['trainer']
 
+    def trainer(self) -> dict:
+        dct = self.config['trainer']
+        dct["device"] = self.config['global']['device']
+        return dct
 
 
 
