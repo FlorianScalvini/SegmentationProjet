@@ -21,25 +21,24 @@ import typing
 
 
 
-def loss_computation(logits_list, labels, loss):
-    loss_coef = loss['coef']
-    lossFunct = loss['coef']
+def loss_computation(logits_list, labels, loss, coef):
     len_logits = len(logits_list)
-    if len_logits != len(loss_coef):
+    if len_logits != len(coef):
         raise ValueError("Different number of logits than loss coef")
     loss_list = []
     for i in range(len(logits_list)):
         logits = logits_list[i]
-        loss_list.append(lossFunct(logits, labels) * loss_coef[i])
+        loss_list.append(loss(logits, labels) * coef[i])
     return loss_list
 
 
 class Trainer():
-    def __init__(self, model, loss, optimizer, scheduler, global_config, train_loader, val_loader=None,
+    def __init__(self, model, loss,optimizer, scheduler, global_config, train_loader, lossCoef, val_loader=None,
                  train_logger=None, epoch=100, early_stopping=None, devices='cpu', val_per_epochs=10):
 
         self.model = model
         self.loss = loss
+        self.lossCoef = lossCoef
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.global_config = global_config

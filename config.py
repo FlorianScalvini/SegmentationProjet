@@ -1,39 +1,14 @@
 import json
-import argparse
-import random
-import time
-from tqdm import *
 import torch.utils.data
 from torch.utils.data import Dataset
-from torchvision import transforms as T
-from torchvision.transforms.functional import hflip, rotate, InterpolationMode
-import numpy as np
-from torch.cuda import amp
-from torch.utils.data import DataLoader
-from Dataset import cityscrape
-from datetime import *
 from transform import *
-from utils.DataPrefetcher import DataPrefetcher
-import os
-import logging
-from val import evaluate
 import inspect
 import utils.loss as loss
 import models
 import transform
 import Dataset
-import typing
-try:
-    from typing import GenericMeta  # python 3.6
-except ImportError:
-    # in 3.7, genericmeta doesn't exist but we don't need it
-    class GenericMeta(type): pass
 
 
-
-def get_instance(module, config, *args):
-    # GET THE CORRESPONDING CLASS / FCT
-    return getattr(module, config['type'])(*config['args'])
 
 def _transform(transform_dict):
     transform_list = []
@@ -50,11 +25,8 @@ def _transform(transform_dict):
         transform_list.append(transf)
     return transform_list
 
-def parserToFunc(funct, dict_val):
-    return
 
-
-class ConfigParser():
+class ConfigParser:
     def __init__(self, path):
         try:
             self.config = json.load(open(path))
@@ -70,9 +42,9 @@ class ConfigParser():
 
 
 
-    def model(self) -> typing.Tuple[typing.GenericMeta, dict, typing.GenericMeta, dict]:
+    def model(self):
         net = getattr(models, self.config['arch']['type'])
-        if 'backbone' in inspect.getargspec(net.__init__)[0]:
+        if 'backbone' in inspect.getfullargspec(net.__init__)[0]:
             try:
                 net_backbone = getattr(models.backbone, self.config['arch']['backbone']['type'])
                 b_kwargs = self.config['arch']['backbone']['args']
@@ -83,26 +55,26 @@ class ConfigParser():
             b_kwargs = None
         return net, self.config['arch']['args'], net_backbone,  b_kwargs
 
-    def loss(self) -> typing.Tuple[typing.GenericMeta, dict]:
+    def loss_config(self):
         lss = getattr(loss, self.config['loss']['type'])
-        return lss, self.config['loss']['args']
+        return lss, self.config['loss']['args'], self.config['loss']['loss']
 
-    def optimizer(self) -> typing.Tuple[typing.GenericMeta, dict]:
+    def optimizer_config(self):
         optim = getattr(torch.optim, self.config['optimizer']['type'])
         return optim, self.config['optimizer']['args']
 
-    def scheduler(self) -> typing.Tuple[typing.GenericMeta, dict]:
+    def scheduler(self):
         schl = getattr(torch.optim.lr_scheduler, self.config['lr_scheduler']['type'])
         return schl, self.config['lr_scheduler']['args']
 
-    def train_loader(self) -> typing.Tuple[dict, typing.GenericMeta, dict]:
+    def train_loader(self):
         loader_config = self.config['train_loader']['args']
         args_dataset = self.config['train_loader']["dataset"]["args"]
         args_dataset['transforms'] = _transform(args_dataset["transforms"])
         train_data = getattr(Dataset, self.config['train_loader']["dataset"]['type'])
         return loader_config, train_data, args_dataset
 
-    def val_loader(self) -> typing.Tuple[dict, typing.GenericMeta, dict]:
+    def val_loader(self):
         loader_config = self.config['val_loader']['args']
         args_dataset = self.config['val_loader']["dataset"]["args"]
         args_dataset['transforms'] = _transform(args_dataset["transforms"])
@@ -110,11 +82,41 @@ class ConfigParser():
         return loader_config, train_data, args_dataset
 
 
-    def trainer(self) -> dict:
+    def trainer(self):
         dct = self.config['trainer']
         dct["device"] = self.config['global']['device']
         return dct
 
-
+    def trainer_config(self):
+        dict_return = self.config['trainer']
+        kwargs_loader, dataset, kwargs_dataset = self.train_loader()
+        train_data = dataset(**kwargs_dataset)
+        train_loader = torch.utils.data.DataLoader(dataset=train_data, **kwargs_loader)
+        dict_return["train_loader"] = train_loader
+        if self.val:
+            kwargs_loader, dataset, kwargs_dataset = self.val_loader()
+            val_data = dataset(**kwargs_dataset)
+            val_loader = torch.utils.data.DataLoader(dataset=val_data, **kwargs_loader)
+            dict_return["val_loader"] = val_loader
+        mdl, kwargs, bck_mdl, bck_kwargs = self.model()
+        bck_mdl = bck_mdl(**bck_kwargs)
+        if 'num_classes' != kwargs.keys():
+            kwargs["num_classes"] = train_data.num_classes
+        model = mdl(backbone=bck_mdl, **kwargs)
+        dict_return["model"] = model
+        loss, kwargs, loss_coef = self.loss_config()
+        loss = loss(**kwargs)
+        dict_return["loss"] = loss
+        dict_return["loss_coef"] = loss_coef
+        optim, kwargs = self.optimizer_config()
+        if 'num_classes' != kwargs.keys():
+            kwargs["params"] = model.parameters()
+        optim = optim(**kwargs)
+        dict_return["optim"] = optim
+        scheduler, kwargs = self.scheduler()
+        scheduler = scheduler(optimizer=optim, **kwargs)
+        dict_return["scheduler"] = scheduler
+        dict_return["device"] = self.config['global']['device']
+        return train_loader
 
 
