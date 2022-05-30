@@ -33,15 +33,15 @@ def loss_computation(logits_list, labels, loss, coef):
 
 
 class Trainer():
-    def __init__(self, model, loss,optimizer, scheduler, global_config, train_loader, lossCoef, val_loader=None,
-                 train_logger=None, epoch=100, early_stopping=None, devices='cpu', val_per_epochs=10):
+    def __init__(self, model, loss, optimizer, scheduler, train_loader, lossCoef, val_loader=None,
+                 train_logger=None, epochs=100, early_stopping=None, devices='cpu', val_per_epochs=10,
+                 save_dir="./saved/", *args, **kwargs):
 
         self.model = model
         self.loss = loss
         self.lossCoef = lossCoef
         self.optimizer = optimizer
         self.scheduler = scheduler
-        self.global_config = global_config
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.train_logger = train_logger
@@ -52,12 +52,12 @@ class Trainer():
         self.save_period = 10
         self.improved = False
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.epochs = epoch
+        self.epochs = epochs
         # SETTING THE DEVICE
         self.device, _ = self._get_available_devices(devices)
         self.model.to(self.device)
         self.scaler = None
-        self.save_dir = "./save/" + datetime.now().strftime("%m_%d__%H_%M_%S") + "/"
+        self.save_dir = save_dir + datetime.now().strftime("%m_%d__%H_%M_%S") + "/"
         self.total_loss = 0.
         self.total_inter, self.total_union = 0, 0
         self.total_correct, self.total_label = 0, 0
@@ -75,18 +75,21 @@ class Trainer():
         best_model_iter = -1
 
 
-    def _get_available_devices(self, n_gpu):
-        sys_gpu = torch.cuda.device_count()
-        if sys_gpu == 0:
-            self.logger.warning('No GPUs detected, using the CPU')
-            n_gpu = 0
-        elif n_gpu > sys_gpu:
-            self.logger.warning(f'Nbr of GPU requested is {n_gpu} but only {sys_gpu} are available')
-            n_gpu = sys_gpu
-
-        device = torch.device('cuda:0' if n_gpu > 0 else 'cpu')
-        self.logger.info(f'Detected GPUs: {sys_gpu} Requested: {n_gpu}')
-        available_gpus = list(range(n_gpu))
+    def _get_available_devices(self, device='gpu', n_gpu=0):
+        if device == 'gpu':
+            sys_gpu = torch.cuda.device_count()
+            if sys_gpu == 0:
+                self.logger.warning('No GPUs detected, using the CPU')
+                n_gpu = 0
+            elif n_gpu > sys_gpu:
+                self.logger.warning(f'Nbr of GPU requested is {n_gpu} but only {sys_gpu} are available')
+                n_gpu = sys_gpu
+            device = torch.device('cuda:0' if n_gpu > 0 else 'cpu')
+            self.logger.info(f'Detected GPUs: {sys_gpu} Requested: {n_gpu}')
+            available_gpus = list(range(n_gpu))
+        else:
+            device = torch.device('cpu')
+            available_gpus = list()
         return device, available_gpus
 
     def _train_epoch(self, epoch):
@@ -135,7 +138,6 @@ class Trainer():
 
     def train(self):
         for epoch in range(self.start_epoch, self.epochs + 1):
-
             results = self._train_epoch(epoch)
             if self.val_loader is not None and epoch % self.val_per_epochs == 0:
                 results = evaluate(model=self.model, eval_loader=self.val_loader, num_classes=self.val_loader.numberClasses, precision=self.precision, print_detail=False)

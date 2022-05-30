@@ -57,7 +57,7 @@ class ConfigParser:
 
     def loss_config(self):
         lss = getattr(loss, self.config['loss']['type'])
-        return lss, self.config['loss']['args'], self.config['loss']['loss']
+        return lss, self.config['loss']['args'], self.config['loss']['coef']
 
     def optimizer_config(self):
         optim = getattr(torch.optim, self.config['optimizer']['type'])
@@ -107,16 +107,16 @@ class ConfigParser:
         loss, kwargs, loss_coef = self.loss_config()
         loss = loss(**kwargs)
         dict_return["loss"] = loss
-        dict_return["loss_coef"] = loss_coef
+        dict_return["lossCoef"] = loss_coef
         optim, kwargs = self.optimizer_config()
         if 'num_classes' != kwargs.keys():
             kwargs["params"] = model.parameters()
         optim = optim(**kwargs)
-        dict_return["optim"] = optim
+        dict_return["optimizer"] = optim
         scheduler, kwargs = self.scheduler()
         scheduler = scheduler(optimizer=optim, **kwargs)
         dict_return["scheduler"] = scheduler
         dict_return["device"] = self.config['global']['device']
-        return train_loader
+        return dict_return
 
 

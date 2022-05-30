@@ -51,9 +51,9 @@
         "dataset" :
         {
             "type": "Cityscapes",
-            "split": "val",
             "args": {
                 "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest",
+                "split": "val",
                 "transforms": {
                     "Resize": [224,244],
                     "RandomCrop": [32,32],
