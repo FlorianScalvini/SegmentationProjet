@@ -19,7 +19,7 @@ def evaluate(model, eval_loader, num_classes, precision='fp32', print_detail=Tru
 
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(tbar):
-            label = label.astype('int64')
+            target = target.astype('int64')
             if precision == 'fp16':
                 with torch.cuda.amp.autocast(enabled=True):
                     preds = model(data)
@@ -28,7 +28,7 @@ def evaluate(model, eval_loader, num_classes, precision='fp32', print_detail=Tru
             if isinstance(preds, tuple):
                 preds = preds[0]
             pred = torch.argmax(preds, dim=1, keepdim=True)
-            inter, pPred, pTarget = calculate_area(pred, label, preds.shape()[1])
+            inter, pPred, pTarget = calculate_area(pred, target, preds.shape()[1])
 
             intersect += intersect
             pred_area += pPred

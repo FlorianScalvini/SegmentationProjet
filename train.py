@@ -1,23 +1,13 @@
-import argparse
-import random
 import time
 from tqdm import *
 import torch.utils.data
-from torch.utils.data import Dataset
-from torchvision import transforms as T
-from torchvision.transforms.functional import hflip, rotate, InterpolationMode
-import numpy as np
-from torch.cuda import amp
-from torch.utils.data import DataLoader
-from Dataset import cityscrape
+from utils.metric import *
 from datetime import *
 from transform import *
 from utils.DataPrefetcher import DataPrefetcher
 import os
 import logging
 from val import evaluate
-import typing
-
 
 
 
@@ -93,47 +83,44 @@ class Trainer():
         return device, available_gpus
 
     def _train_epoch(self, epoch):
+        num_classes = self.model.num_classes
         self.model.train()
         self._reset_metrics()
-        tic = time.time()
+        total_loss = 0.0
+        intersect = torch.zeros(num_classes)
+        pred_area = torch.zeros(num_classes)
+        label_area = torch.zeros(num_classes)
         tbar = tqdm(self.train_loader, ncols=130)
         for batch_idx, (data, target) in enumerate(tbar):
+            target = target.astype('int64')
             self.optimizer.zero_grad()
-            self.data_time.update(time.time() - tic)
             # data, target = data.to(self.device), target.to(self.device)
             if self.scaler is not None:
                 with torch.cuda.amp.autocast():
-                    output = self.model(data)
-                    loss = loss_computation(logits_list=output, labels=target, loss=self.loss)
-                    loss = loss.sum()
+                    preds = self.model(data)
+                    loss = loss_computation(logits_list=preds, labels=target, loss=self.loss, coef=self.lossCoef)
+                    total_loss += loss.sum()
                 self.scaler.scale(loss).backward()
                 self.scaler.step(optimizer=self.optimizer)
                 self.scaler.update()
             else:
-                output = self.model(data)
-                loss = loss_computation(logits_list=output, labels=target, loss=self.loss)
-                loss = loss.sum()
+                preds = self.model(data)
+                total_loss = loss_computation(logits_list=preds, labels=target, loss=self.loss, coef=self.lossCoef)
+                total_loss = loss.sum()
                 loss.backward()
                 self.optimizer.step()
-
-            preds = torch.argmax(output, dim=1,keepdim=True)
-            seg_metrics = eval_metrics(output, target, self.num_classes)
-            # FOR EVAL
-            seg_metrics = eval_metrics(output, target, self.num_classes)
-            self._update_seg_metrics(*seg_metrics)
-            pixAcc, mIoU, _ = self._get_seg_metrics().values()
-
-            # PRINT INFO
-            tbar.set_description('TRAIN ({}) | Loss: {:.3f} | Acc {:.2f} mIoU {:.2f} | B {:.2f} D {:.2f} |'.format(
-                epoch, self.total_loss.average,
-                pixAcc, mIoU,
-                self.batch_time.average, self.data_time.average))
+            if isinstance(preds, tuple):
+                preds = preds[0]
+            pred = torch.argmax(preds, dim=1, keepdim=True)
+            inter, pPred, pTarget = calculate_area(pred, target, preds.shape()[1])
+            intersect += intersect
+            pred_area += pPred
+            label_area += pTarget
+            tbar.update()
 
         # RETURN LOSS & METRICS
-        log = {'loss': self.total_loss.average,
-               **seg_metrics}
+        log = {'loss': self.total_loss.average, }
 
-        # if self.lr_scheduler is not None: self.lr_scheduler.step()
         return log
 
     def train(self):
