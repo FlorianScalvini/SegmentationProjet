@@ -51,7 +51,6 @@ class Trainer():
         self.total_loss = 0.
         self.total_inter, self.total_union = 0, 0
         self.total_correct, self.total_label = 0, 0
-
         if self.device ==  torch.device('cpu'): prefetch = False
         self.precision = 'fp32'
         if self.precision == 'fp16':
@@ -82,7 +81,7 @@ class Trainer():
             available_gpus = list()
         return device, available_gpus
 
-    def _train_epoch(self, epoch):
+    def _train_epoch(self):
         num_classes = self.model.num_classes
         self.model.train()
         self._reset_metrics()
@@ -119,8 +118,16 @@ class Trainer():
             tbar.update()
 
         # RETURN LOSS & METRICS
-        log = {'loss': self.total_loss.average, }
-
+        class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area, ignore_label=None)
+        acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)
+        kap = kappa(aInter=intersect, aPreds=pred_area, aLabels=label_area)
+        log = {
+            'loss': self.total_loss / (len(self.train_loader) * self.train_loader.,
+            'miou': miou,
+            'class_iou': class_iou,
+            'class_precision': class_precision,
+            'kappa': kap
+        }
         return log
 
     def train(self):
