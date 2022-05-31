@@ -14,7 +14,7 @@ from val import evaluate
 
 class Trainer():
     def __init__(self, model, loss, optimizer, scheduler, train_loader, lossCoef, val_loader=None,
-                 epochs=100, early_stopping=None, devices='cpu', val_per_epochs=10,
+                 epochs=100, early_stopping=None, device='cpu', val_per_epochs=10,
                  save_dir="./saved/", ignore_label=None, *args, **kwargs):
 
         self.model = model
@@ -34,7 +34,7 @@ class Trainer():
         self.logger = logging.getLogger(self.__class__.__name__)
         self.epochs = epochs
         # SETTING THE DEVICE
-        self.device, _ = self._get_available_devices(devices)
+        self.device = self._get_available_devices(device)
         self.model.to(self.device)
         self.scaler = None
         self.save_dir = save_dir + datetime.now().strftime("%m_%d__%H_%M_%S") + "/"
@@ -60,13 +60,11 @@ class Trainer():
             elif n_gpu > sys_gpu:
                 self.logger.warning(f'Nbr of GPU requested is {n_gpu} but only {sys_gpu} are available')
                 n_gpu = sys_gpu
-            device = torch.device('cuda:0' if n_gpu > 0 else 'cpu')
+            device = torch.device('cuda:0')
             self.logger.info(f'Detected GPUs: {sys_gpu} Requested: {n_gpu}')
-            available_gpus = list(range(n_gpu))
         else:
             device = torch.device('cpu')
-            available_gpus = list()
-        return device, available_gpus
+        return device
 
     def _train_epoch(self):
         num_classes = self.model.num_classes
@@ -78,26 +76,27 @@ class Trainer():
         label_area = torch.zeros(num_classes)
         tbar = tqdm(self.train_loader, ncols=130)
         for batch_idx, (data, target) in enumerate(tbar):
+            data = data.to(self.device)
+            target = target.to(self.device)
             self.optimizer.zero_grad()
             # data, target = data.to(self.device), target.to(self.device)
             if self.scaler is not None:
                 with torch.cuda.amp.autocast():
                     preds = self.model(data)
-                    loss = loss_computation(logits_list=preds, labels=target, loss=self.loss, coef=self.lossCoef)
-                    total_loss += loss.sum()
+                    loss = loss_computation(logits_list=preds, labels=target.squeeze(), criterion=self.loss, coef=self.lossCoef).sum()
                 self.scaler.scale(loss).backward()
                 self.scaler.step(optimizer=self.optimizer)
                 self.scaler.update()
             else:
                 preds = self.model(data)
-                total_loss = loss_computation(logits_list=preds, labels=target, loss=self.loss, coef=self.lossCoef)
-                total_loss += loss.sum()
+                loss = loss_computation(logits_list=preds, labels=target.squeeze().long(), criterion=self.loss, coef=self.lossCoef).sum()
                 loss.backward()
                 self.optimizer.step()
-            if isinstance(preds, tuple):
+            total_loss += loss
+            if isinstance(preds, tuple) or isinstance(preds, list):
                 preds = preds[0]
             pred = torch.argmax(preds, dim=1, keepdim=True)
-            inter, pPred, pTarget = calculate_area(pred, target, preds.shape()[1])
+            inter, pPred, pTarget = calculate_area(pred, target, preds.shape[1])
             intersect += intersect
             pred_area += pPred
             label_area += pTarget
@@ -191,22 +190,3 @@ class Trainer():
         self.optimizer.load_state_dict(checkpoint['optimizer'])
 
         self.logger.info(f'Checkpoint <{resume_path}> (epoch {self.start_epoch}) was loaded')
-
-"""
-def train(model,
-          config,
-          precision='fp32'):
-
-    model.train()
-    print(model)
-    device = 'gpu'
-
-
-    train_dataset = cityscrape.Cityscapes(root="/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
-                                          mode='train', transforms=[Resize((224,244)), Normalize(32,32)])
-    val_dataset = cityscrape.Cityscapes(root="/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
-                                          mode='val', transforms=[Resize((224,244)), Normalize(32,32)])
-    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=2, num_workers=4, drop_last=True)
-    val_loader = torch.utils.data.DataLoader(dataset=val_dataset, batch_size=2, num_workers=4, drop_last=True)
-    Trainer(model=model, loss=loss, config=config, train_logger=train_loader, val_loader=val_loader, precision=precision)
-"""

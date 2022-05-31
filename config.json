@@ -1,6 +1,6 @@
 {
     "global": {
-        "device": "Test",
+        "device": "gpu",
         "train" : true,
         "val" :  true,
         "test" : false,
@@ -103,7 +103,7 @@
         "monitor": "max Mean_IoU",
         "early_stop": 10,
         "tensorboard": true,
-        "log_dir": "saved/runs",
+        "log_dir": "saved\\runs",
         "log_per_iter": 20,
         "val": true,
         "val_per_epochs": 5
