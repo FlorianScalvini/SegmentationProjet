@@ -78,7 +78,6 @@ class Trainer():
         label_area = torch.zeros(num_classes)
         tbar = tqdm(self.train_loader, ncols=130)
         for batch_idx, (data, target) in enumerate(tbar):
-            target = target.astype('int64')
             self.optimizer.zero_grad()
             # data, target = data.to(self.device), target.to(self.device)
             if self.scaler is not None:

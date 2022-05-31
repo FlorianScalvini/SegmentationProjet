@@ -29,10 +29,10 @@
             "args": {
                 "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest",
                 "transforms": {
-                    "Resize": [224,244],
-                    "RandomCrop": [32,32],
+                    "Resize": [2048,1024],
+                    "RandomCrop": [1024,512],
                     "Rotate": null,
-                    "HorizontalFlip": null,
+                    "HorizontalFlip": true,
                     "Blur": null,
                     "Normalize":
                     {
@@ -55,8 +55,8 @@
                 "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest",
                 "split": "val",
                 "transforms": {
-                    "Resize": [224,244],
-                    "RandomCrop": [32,32],
+                    "Resize": [2048,1024],
+                    "RandomCrop": [1024,512],
                     "Rotate": null,
                     "HorizontalFlip": null,
                     "Blur": null,
@@ -85,7 +85,7 @@
 
     "loss" : {
         "type": "CrossEntropyLoss2d",
-        "coef" : [],
+        "coef" : [1,0.2,0.2],
         "args": {
             "ignore_index": 255
         }

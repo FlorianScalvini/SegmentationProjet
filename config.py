@@ -19,7 +19,7 @@ def _transform(transform_dict):
         if value is True or value is None:
             transf = getattr(transform, key)()
         elif isinstance(value, dict):
-            transf = getattr(transform, key)(*value)
+            transf = getattr(transform, key)(**value)
         else:
             transf = getattr(transform, key)(value)
         transform_list.append(transf)

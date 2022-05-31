@@ -124,7 +124,6 @@ class Normalize():
         if label is not None:
             if not isinstance(image, torch.Tensor):
                 label = self.toTensor(label)
-            label = self.toNormalize(label)
         return (image, label)
 
 
@@ -166,12 +165,3 @@ class Normalize():
             gaussian_blur = T.GaussianBlur(ksize, sigma)
             image = gaussian_blur(image)
         return image, label
-
-import numpy as np
-import PIL.Image as Image
-
-if "__main__" == __name__:
-    a = Image.open("/home/ubuntu/Bureau/grille.png")
-    tr = Transform([Resize((224,244)), Normalize(32,32)])
-    b = tr(a)
-    print("")

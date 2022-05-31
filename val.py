@@ -15,7 +15,6 @@ def evaluate(model, eval_loader, num_classes, loss=None, lossCoef=None,
     total_loss = 0
     with torch.no_grad():
         for batch_idx, (data, target) in enumerate(tbar):
-            target = target.astype('int64')
             if precision == 'fp16':
                 with torch.cuda.amp.autocast(enabled=True):
                     preds = model(data)
