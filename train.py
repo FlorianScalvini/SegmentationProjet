@@ -5,27 +5,16 @@ from utils.metric import *
 from datetime import *
 from transform import *
 from utils.DataPrefetcher import DataPrefetcher
+from utils.loss import loss_computation
 import os
 import logging
 from val import evaluate
 
 
-
-def loss_computation(logits_list, labels, loss, coef):
-    len_logits = len(logits_list)
-    if len_logits != len(coef):
-        raise ValueError("Different number of logits than loss coef")
-    loss_list = []
-    for i in range(len(logits_list)):
-        logits = logits_list[i]
-        loss_list.append(loss(logits, labels) * coef[i])
-    return loss_list
-
-
 class Trainer():
     def __init__(self, model, loss, optimizer, scheduler, train_loader, lossCoef, val_loader=None,
-                 train_logger=None, epochs=100, early_stopping=None, devices='cpu', val_per_epochs=10,
-                 save_dir="./saved/", *args, **kwargs):
+                 epochs=100, early_stopping=None, devices='cpu', val_per_epochs=10,
+                 save_dir="./saved/", ignore_label=None, *args, **kwargs):
 
         self.model = model
         self.loss = loss
@@ -34,9 +23,9 @@ class Trainer():
         self.scheduler = scheduler
         self.train_loader = train_loader
         self.val_loader = val_loader
-        self.train_logger = train_logger
         self.start_epoch = 1
         self.early_stoping = early_stopping
+        self.metric = 'miou',
         if val_loader is not None:
             self.val_per_epochs = val_per_epochs
         self.save_period = 10
@@ -51,17 +40,13 @@ class Trainer():
         self.total_loss = 0.
         self.total_inter, self.total_union = 0, 0
         self.total_correct, self.total_label = 0, 0
+        self.ignore_labels = 255
         if self.device ==  torch.device('cpu'): prefetch = False
         self.precision = 'fp32'
         if self.precision == 'fp16':
             print('use AMP to train.')
             self.scaler = torch.cuda.amp.GradScaler()
         torch.backends.cudnn.benchmark = True
-
-        avg_loss = 0.0
-        avg_loss_list = []
-        best_mean_iou = -1.0
-        best_model_iter = -1
 
 
     def _get_available_devices(self, device='gpu', n_gpu=0):
@@ -105,7 +90,7 @@ class Trainer():
             else:
                 preds = self.model(data)
                 total_loss = loss_computation(logits_list=preds, labels=target, loss=self.loss, coef=self.lossCoef)
-                total_loss = loss.sum()
+                total_loss += loss.sum()
                 loss.backward()
                 self.optimizer.step()
             if isinstance(preds, tuple):
@@ -118,11 +103,11 @@ class Trainer():
             tbar.update()
 
         # RETURN LOSS & METRICS
-        class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area, ignore_label=None)
+        class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area, ignore_label=self.ignore_labels)
         acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         kap = kappa(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         log = {
-            'loss': self.total_loss / (len(self.train_loader) * self.train_loader.,
+            'loss': self.total_loss / (len(self.train_loader) * self.train_loader.batch_size),
             'miou': miou,
             'class_iou': class_iou,
             'class_precision': class_precision,
@@ -130,32 +115,27 @@ class Trainer():
         }
         return log
 
+
     def train(self):
+        best_metric = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
-            results = self._train_epoch(epoch)
-            if self.val_loader is not None and epoch % self.val_per_epochs == 0:
-                results = evaluate(model=self.model, eval_loader=self.val_loader, num_classes=self.val_loader.numberClasses, precision=self.precision, print_detail=False)
-                # LOGGING INFO
-                self.logger.info(f'\n ## Info for epoch {epoch} ## ')
-                for k, v in results.items():
-                    self.logger.info(f'         {str(k):15s}: {v}')
+            train_log = self._train_epoch()
+            val_log = evaluate(model=self.model, eval_loader=self.val_loader, num_classes=self.val_loader.numberClasses, precision=self.precision, print_detail=False)
+            self.scheduler.step(val_log['loss'])
+            # LOGGING INFO
+            self.logger.info(f'\n ## Info for epoch {epoch} ## ')
+            for k, v in train_log.items():
+                self.logger.info(f'         {str(k):15s}: {v}')
 
-            if self.train_logger is not None:
-                log = {'epoch': epoch, **results}
-                self.train_logger.add_entry(log)
+            log = {'epoch': epoch,
+                   'train': train_log,
+                   'val':  val_log}
 
-            if self.mnt_mode != 'off' and epoch % self.config['trainer']['val_per_epochs'] == 0:
-                try:
-                    if self.mnt_mode == 'min':
-                        self.improved = (log[self.mnt_metric] < self.mnt_best)
-                    else:
-                        self.improved = (log[self.mnt_metric] > self.mnt_best)
-                except KeyError:
-                    self.logger.warning(f'The metrics being tracked ({self.mnt_metric}) has not been calculated. Training stops.')
-                    break
+            if epoch % self.config['trainer']['val_per_epochs'] == 0:
+                self.improved = (val_log[self.metric] > best_metric)
 
                 if self.improved:
-                    self.mnt_best = log[self.mnt_metric]
+                    self.mnt_best = val_log[self.metric]
                     self.not_improved_count = 0
                 else:
                     self.not_improved_count += 1
@@ -164,7 +144,6 @@ class Trainer():
                     self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping} epochs')
                     self.logger.warning('Training Stoped')
                     break
-
             # SAVE CHECKPOINT
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=self.improved)

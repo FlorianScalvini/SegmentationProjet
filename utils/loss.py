@@ -4,15 +4,27 @@ import torch.nn.functional as F
 import torch.nn as nn
 import sklearn.metrics as skmetrics
 
-def calculate_area(prediction, target, classes):
+
+def loss_computation(logits_list, labels, loss, coef):
+    len_logits = len(logits_list)
+    if len_logits != len(coef):
+        raise ValueError("Different number of logits than loss coef")
+    loss_list = []
+    for i in range(len(logits_list)):
+        logits = logits_list[i]
+        loss_list.append(loss(logits, labels) * coef[i])
+    return loss_list
+
+
+def calculate_area(prediction, target, num_classes):
     def make_one_hot(labels, classes):
         one_hot = torch.FloatTensor(labels.size()[0], classes, labels.size()[2], labels.size()[3]).zero_().to(
             labels.device)
         target = one_hot.scatter_(1, labels.data, 1)
 
         return target
-    one_hot_preds = make_one_hot(prediction, classes)
-    one_hot_targets = make_one_hot(target, classes)
+    one_hot_preds = make_one_hot(prediction, num_classes)
+    one_hot_targets = make_one_hot(target, num_classes)
     intersection = (one_hot_preds*one_hot_targets).sum(dim=(2,3)).numpy()
     pPreds = one_hot_preds.sum(dim=(0, 2, 3)).numpy()
     pTarget = one_hot_targets.sum(dim=(0, 2, 3)).numpy()
@@ -35,7 +47,7 @@ class DiceLoss(nn.Module):
         self.smooth = smooth
 
     def forward(self, preds, targets):
-        aInter, aPreds, aLabels = calculate_area(preds, targets)
+        aInter, aPreds, aLabels = calculate_area(preds, targets, preds.shape()[1])
         loss = 1 - ((2. * aInter.sum() + self.smooth) /
                     (aPreds.sum() + aLabels.sum() + self.smooth))
         return loss
