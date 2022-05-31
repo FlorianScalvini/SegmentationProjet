@@ -1,5 +1,6 @@
 import time
 from tqdm import *
+from torch.utils.tensorboard import SummaryWriter
 import torch.utils.data
 from utils.metric import *
 from datetime import *
@@ -25,7 +26,7 @@ class Trainer():
         self.val_loader = val_loader
         self.start_epoch = 1
         self.early_stoping = early_stopping
-        self.metric = 'miou',
+        self.metric = 'miou'
         if val_loader is not None:
             self.val_per_epochs = val_per_epochs
         self.save_period = 10
@@ -48,6 +49,7 @@ class Trainer():
             self.scaler = torch.cuda.amp.GradScaler()
         torch.backends.cudnn.benchmark = True
 
+        #writer = SummaryWriter()
 
     def _get_available_devices(self, device='gpu', n_gpu=0):
         if device == 'gpu':
