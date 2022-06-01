@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+import torch.nn.functional as F
 
 def kappa(aInter, aPreds, aLabels):
     """
@@ -58,15 +58,9 @@ def meanIoU(aInter, aPreds, aLabels, ignore_label=None):
 
 
 def calculate_area(prediction, target, classes):
-    def make_one_hot(labels, classes):
-        one_hot = torch.FloatTensor(labels.size()[0], classes, labels.size()[2], labels.size()[3]).zero_().to(
-            labels.device)
-        target = one_hot.scatter_(1, labels.data, 1)
-
-        return target
-    one_hot_preds = make_one_hot(prediction, classes)
-    one_hot_targets = make_one_hot(target, classes)
-    intersection = (one_hot_preds*one_hot_targets).sum(dim=(2,3)).numpy()
-    pPreds = one_hot_preds.sum(dim=(0, 2, 3)).numpy()
-    pTarget = one_hot_targets.sum(dim=(0, 2, 3)).numpy()
+    one_hot_preds = F.one_hot(prediction, classes).transpose(1,3)
+    one_hot_targets = F.one_hot(target, classes).transpose(1,3)
+    intersection = (one_hot_preds*one_hot_targets).sum(dim=(2,3)).cpu().numpy()
+    pPreds = one_hot_preds.sum(dim=(0, 2, 3)).cpu().numpy()
+    pTarget = one_hot_targets.sum(dim=(0, 2, 3)).cpu().numpy()
     return intersection, pPreds, pTarget

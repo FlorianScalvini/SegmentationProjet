@@ -1,5 +1,5 @@
 import time
-from tqdm import *
+from tqdm.auto import tqdm, trange
 from torch.utils.tensorboard import SummaryWriter
 import torch.utils.data
 from utils.metric import *
@@ -66,7 +66,7 @@ class Trainer():
             device = torch.device('cpu')
         return device
 
-    def _train_epoch(self):
+    def _train_epoch(self, epoch=None):
         num_classes = self.model.num_classes
         self.model.train()
         self._reset_metrics()
@@ -74,34 +74,23 @@ class Trainer():
         intersect = torch.zeros(num_classes)
         pred_area = torch.zeros(num_classes)
         label_area = torch.zeros(num_classes)
-        tbar = tqdm(self.train_loader, ncols=130)
+        tbar = tqdm(self.train_loader, ncols=130, position=0, leave=True)
         for batch_idx, (data, target) in enumerate(tbar):
             data = data.to(self.device)
             target = target.to(self.device)
             self.optimizer.zero_grad()
-            # data, target = data.to(self.device), target.to(self.device)
-            if self.scaler is not None:
-                with torch.cuda.amp.autocast():
-                    preds = self.model(data)
-                    loss = loss_computation(logits_list=preds, labels=target.squeeze(), criterion=self.loss, coef=self.lossCoef).sum()
-                self.scaler.scale(loss).backward()
-                self.scaler.step(optimizer=self.optimizer)
-                self.scaler.update()
-            else:
-                preds = self.model(data)
-                loss = loss_computation(logits_list=preds, labels=target.squeeze().long(), criterion=self.loss, coef=self.lossCoef).sum()
-                loss.backward()
-                self.optimizer.step()
+
+            preds = self.model(data)
+            loss = loss_computation(logits_list=preds, labels=target, criterion=self.loss, coef=self.lossCoef).sum()
+            loss.backward()
             total_loss += loss
             if isinstance(preds, tuple) or isinstance(preds, list):
                 preds = preds[0]
-            pred = torch.argmax(preds, dim=1, keepdim=True)
+            pred = torch.argmax(preds, dim=1, keepdim=True).squeeze()
             inter, pPred, pTarget = calculate_area(pred, target, preds.shape[1])
             intersect += intersect
             pred_area += pPred
             label_area += pTarget
-            tbar.update()
-
         # RETURN LOSS & METRICS
         class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area, ignore_label=self.ignore_labels)
         acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)

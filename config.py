@@ -91,7 +91,7 @@ class ConfigParser:
         dict_return = self.config['trainer']
         kwargs_loader, dataset, kwargs_dataset = self.train_loader()
         train_data = dataset(**kwargs_dataset)
-        train_loader = torch.utils.data.DataLoader(dataset=train_data, **kwargs_loader)
+        train_loader = torch.utils.data.DataLoader(dataset=train_data, shuffle=True, drop_last=True, prefetch_factor=2, pin_memory=True, **kwargs_loader)
         dict_return["train_loader"] = train_loader
         if self.val:
             kwargs_loader, dataset, kwargs_dataset = self.val_loader()

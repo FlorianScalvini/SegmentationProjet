@@ -7,7 +7,6 @@ import sklearn.metrics as skmetrics
 
 def loss_computation(logits_list, labels, criterion, coef):
     len_logits = len(logits_list)
-    print(len_logits)
     if len_logits != len(coef):
         raise ValueError("Different number of logits than loss coef. This model requiert " + str(len(logits_list)) + " coeffients")
     loss = 0

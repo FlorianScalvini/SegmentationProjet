@@ -31,7 +31,7 @@ class BaseDataSet(Dataset):
         image, label = self.transforms(image, label)
         if self.mapping is not None:
             label = self.encode_labels(label)
-        return image, label
+        return image, label.squeeze().long()
 
     def encode_labels(self,mask):
         label_mask = torch.zeros_like(mask)
