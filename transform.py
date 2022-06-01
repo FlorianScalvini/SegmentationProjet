@@ -2,6 +2,8 @@ import torch
 from torchvision import transforms as T
 from torchvision.transforms.functional import hflip, rotate, InterpolationMode
 import random
+import numpy as np
+
 
 class Transform:
     def __init__(self, transforms = []):
@@ -14,7 +16,6 @@ class Transform:
                 return
         self.transforms.append(ToTensor())
 
-
     def __call__(self, im, label=None):
         for transform in self.transforms:
             outputs = transform(im, label)
@@ -24,17 +25,19 @@ class Transform:
 
         return (im, label)
 
-class ToTensor():
+
+class ToTensor:
     def __init__(self):
         self.toTensor =  T.ToTensor()
 
     def __call__(self, image, label=None):
         image = self.toTensor(image)
         if label is not None:
-            label = self.toTensor(label)
+            label = torch.from_numpy(np.array(label, dtype=np.int32)).long()
         return (image, label)
 
-class Blur():
+
+class Blur:
     def __init__(self):
         return
 
@@ -115,15 +118,9 @@ class Normalize():
         self.mean = mean
         self.std = std
         self.toNormalize = T.Normalize(mean=self.mean, std=self.std)
-        self.toTensor = T.ToTensor()
 
     def __call__(self, image, label=None):
-        if not isinstance(image, torch.Tensor):
-            image = self.toTensor(image)
         image = self.toNormalize(image)
-        if label is not None:
-            if not isinstance(image, torch.Tensor):
-                label = self.toTensor(label)
         return (image, label)
 
 

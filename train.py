@@ -48,7 +48,8 @@ class Trainer():
             print('use AMP to train.')
             self.scaler = torch.cuda.amp.GradScaler()
         torch.backends.cudnn.benchmark = True
-
+        self.train_loader = DataPrefetcher(train_loader, device=self.device)
+        self.val_loader = DataPrefetcher(val_loader, device=self.device)
         #writer = SummaryWriter()
 
     def _get_available_devices(self, device='gpu', n_gpu=0):
@@ -71,15 +72,14 @@ class Trainer():
         self.model.train()
         self._reset_metrics()
         total_loss = 0.0
-        intersect = torch.zeros(num_classes)
-        pred_area = torch.zeros(num_classes)
-        label_area = torch.zeros(num_classes)
+        intersect = torch.zeros(num_classes).to(self.device)
+        pred_area = torch.zeros(num_classes).to(self.device)
+        label_area = torch.zeros(num_classes).to(self.device)
         tbar = tqdm(self.train_loader, ncols=130, position=0, leave=True)
         for batch_idx, (data, target) in enumerate(tbar):
             data = data.to(self.device)
             target = target.to(self.device)
             self.optimizer.zero_grad()
-
             preds = self.model(data)
             loss = loss_computation(logits_list=preds, labels=target, criterion=self.loss, coef=self.lossCoef).sum()
             loss.backward()
@@ -88,9 +88,10 @@ class Trainer():
                 preds = preds[0]
             pred = torch.argmax(preds, dim=1, keepdim=True).squeeze()
             inter, pPred, pTarget = calculate_area(pred, target, preds.shape[1])
-            intersect += intersect
-            pred_area += pPred
-            label_area += pTarget
+            intersect = torch.add(inter, intersect)
+            pred_area = torch.add(pPred, pred_area)
+            label_area = torch.add(pTarget, label_area)
+
         # RETURN LOSS & METRICS
         class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area, ignore_label=self.ignore_labels)
         acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)
