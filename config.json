@@ -60,6 +60,11 @@
                     "Rotate": null,
                     "HorizontalFlip": null,
                     "Blur": null,
+                    "ColorJitter": {
+                        "brightness" : 0.5,
+                        "contrast" : 0.5,
+                        "saturation" : 0.5
+                    },
                     "Normalize":
                     {
                         "mean": [0.485, 0.456, 0.406],
@@ -69,8 +74,8 @@
             }
         },
         "args": {
-            "batch_size": 4,
-            "num_workers": 4
+            "batch_size": 7,
+            "num_workers": 14
         }
     },
 

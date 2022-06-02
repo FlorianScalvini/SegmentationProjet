@@ -18,7 +18,7 @@ class Trainer():
                  save_dir="./saved/", ignore_label=None, *args, **kwargs):
 
         self.model = model
-        self.loss = loss
+        self.criterion = loss
         self.lossCoef = lossCoef
         self.optimizer = optimizer
         self.scheduler = scheduler
@@ -80,10 +80,21 @@ class Trainer():
             data = data.to(self.device)
             target = target.to(self.device)
             self.optimizer.zero_grad()
-            preds = self.model(data)
-            loss = loss_computation(logits_list=preds, labels=target, criterion=self.loss, coef=self.lossCoef).sum()
-            loss.backward()
-            total_loss += loss
+            if self.scaler is not None:
+                with torch.cuda.amp.autocast():
+                    preds = self.model(data)
+                    loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
+                                            coef=self.lossCoef).sum()
+                    loss = loss.sum()
+                self.scaler.scale(loss).backward()
+                self.scaler.step(optimizer=self.optimizer)
+                self.scaler.update()
+            else:
+                preds = self.model(data)
+                loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
+                                        coef=self.lossCoef).sum()
+                loss.backward()
+                total_loss += loss
             if isinstance(preds, tuple) or isinstance(preds, list):
                 preds = preds[0]
             pred = torch.argmax(preds, dim=1, keepdim=True).squeeze()
@@ -110,7 +121,9 @@ class Trainer():
         best_metric = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
             train_log = self._train_epoch()
-            val_log = evaluate(model=self.model, eval_loader=self.val_loader, num_classes=self.val_loader.dataset.num_classes, precision=self.precision, print_detail=False)
+            val_log = evaluate(model=self.model, eval_loader=self.val_loader, device=self.device,
+                               num_classes=self.val_loader.dataset.num_classes, criterion=self.criterion,
+                               precision=self.precision, print_detail=False)
             self.scheduler.step(val_log['loss'])
             # LOGGING INFO
             self.logger.info(f'\n ## Info for epoch {epoch} ## ')

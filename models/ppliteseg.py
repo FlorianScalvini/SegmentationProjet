@@ -71,8 +71,7 @@ class PPLiteSeg(BaseModel):
                 for x in logit_list]
         else:
             x = self.seg_heads[0](feats_head[0])
-            x = nn.functional.interpolate(x, x_hw, mode='bilinear', align_corners=False)
-            logit_list = [x]
+            logit_list = nn.functional.interpolate(x, x_hw, mode='bilinear', align_corners=False)
 
         return logit_list
 

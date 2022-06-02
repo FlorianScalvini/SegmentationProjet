@@ -52,7 +52,7 @@ class STDCSeg(BaseModel):
             feat_fuse = self.ffm(feat_res8, feat_cp8)
             feat_out = self.conv_out(feat_fuse)
             feat_out = nn.functional.interpolate(feat_out, x_size, mode='bilinear', align_corners=True)
-            logit_list = [feat_out]
+            logit_list = feat_out
         return logit_list
 
     def init_weight(self):

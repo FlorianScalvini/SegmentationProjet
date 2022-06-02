@@ -30,7 +30,7 @@ class BisenetV2(BaseModel):
         feat1, feat2, feat3, feat4, sfm = self.sb(x)
         out = self.head(self.bga(dfm, sfm))
         if not self.training:
-            out_list = [out]
+            out_list = out
         else:
             out_1 = self.aux_head1(feat1)
             out_2 = self.aux_head2(feat2)
