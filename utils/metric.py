@@ -30,21 +30,19 @@ def class_measurement(aInter, aPreds, aLabels):
     return mean_acc.item(), class_precision, class_recall
 
 
-def meanIoU(aInter, aPreds, aLabels, ignore_label=None):
-    if ignore_label is None and ignore_label in range(aPreds.shape[0]):
-        valid_class = aPreds.shape[0] - 1
-    else:
-        valid_class = aPreds.shape[0]
+def meanIoU(aInter, aPreds, aLabels):
     union = aPreds + aLabels - aInter
     class_iou = aInter / union
-    miou = class_iou.sum() / valid_class
+    miou = torch.mean(class_iou)
     return class_iou, miou.item()
 
 
-def calculate_area(prediction, target, classes):
-    one_hot_preds = F.one_hot(prediction, classes).transpose(1,3)
-    one_hot_targets = F.one_hot(target, classes).transpose(1,3)
-    intersection = (one_hot_preds*one_hot_targets).sum(dim=(0,2,3))
-    pPreds = one_hot_preds.sum(dim=(0, 2, 3))
-    pTarget = one_hot_targets.sum(dim=(0, 2, 3))
-    return intersection, pPreds, pTarget
+def calculate_hist(prediction, target, num_classes, ignore_labels=None):
+    if ignore_labels is None:
+        intersection = (prediction == target) * prediction
+    else:
+        intersection = (target != ignore_labels) * (prediction == target) * prediction
+    preds_intersection = torch.histc(intersection, bins=num_classes, min=0, max=num_classes-1)
+    preds_hist= torch.histc(prediction, bins=num_classes, min=0, max=num_classes-1)
+    target_hist = torch.histc(target, bins=num_classes, min=0, max=num_classes-1)
+    return preds_intersection, preds_hist, target_hist

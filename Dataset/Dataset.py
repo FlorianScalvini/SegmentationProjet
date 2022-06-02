@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from transform import Transform
 
-class LabelInfo:
+class Label:
     def __init__(self, name, id, trainId, category, categoryId, hasInstances, ignoreInEval, color):
         self.name = name
         self.id = id
@@ -18,14 +18,28 @@ class LabelInfo:
         self.color = color
 
 
+def _label_metadata(labels):
+    mapping = {}
+    if not isinstance(labels, list):
+        raise ValueError('It is not a list')
+    for label in labels:
+        if not isinstance(label, Label):
+            raise ValueError('It is not a list of Labels')
+        mapping[label.id] = label.trainId
+    return mapping
+
+
 class BaseDataSet(Dataset):
-    def __init__(self, root, num_classes, transforms=Transform()):
+    def __init__(self, root, num_classes, transforms=Transform(), labels=None):
         self.num_classes = num_classes
         self.root = root
         self.transforms = Transform(transforms=transforms)
         self.files = []
         self.palette = None
-        self.mapping = None
+        if labels is not None:
+            self.mapping = _label_metadata(labels)
+        else:
+            self.mapping = None
         if self.transforms is None:
             raise ValueError("`transforms` is necessary, but it is None.")
 

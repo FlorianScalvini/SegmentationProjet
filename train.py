@@ -87,17 +87,17 @@ class Trainer():
             if isinstance(preds, tuple) or isinstance(preds, list):
                 preds = preds[0]
             pred = torch.argmax(preds, dim=1, keepdim=True).squeeze()
-            inter, pPred, pTarget = calculate_area(pred, target, preds.shape[1])
+            inter, pPred, pTarget = calculate_hist(pred, target, preds.shape[1], ignore_labels=self.ignore_labels)
             intersect = torch.add(inter, intersect)
             pred_area = torch.add(pPred, pred_area)
             label_area = torch.add(pTarget, label_area)
 
         # RETURN LOSS & METRICS
-        class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area, ignore_label=self.ignore_labels)
+        class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         kap = kappa(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         log = {
-            'loss': self.total_loss / (len(self.train_loader) * self.train_loader.batch_size),
+            'loss': self.total_loss / (len(self.train_loader) * self.train_loader.loader.batch_size),
             'miou': miou,
             'class_iou': class_iou,
             'class_precision': class_precision,
@@ -110,7 +110,7 @@ class Trainer():
         best_metric = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
             train_log = self._train_epoch()
-            val_log = evaluate(model=self.model, eval_loader=self.val_loader, num_classes=self.val_loader.numberClasses, precision=self.precision, print_detail=False)
+            val_log = evaluate(model=self.model, eval_loader=self.val_loader, num_classes=self.val_loader.dataset.num_classes, precision=self.precision, print_detail=False)
             self.scheduler.step(val_log['loss'])
             # LOGGING INFO
             self.logger.info(f'\n ## Info for epoch {epoch} ## ')

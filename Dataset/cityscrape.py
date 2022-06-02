@@ -21,39 +21,8 @@ from Dataset.Dataset import BaseDataSet, Label
 import PIL.Image as Image
 
 
-class Cityscapes(BaseDataSet):
-    def __init__(self, transforms, root, split='train', *args):
-        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms)
-        self.file_list = list()
-        self.split = split.lower()
-        self.ignore_index = 0
-        img_dir = os.path.join(self.root, 'leftImg8bit')
-        label_dir = os.path.join(self.root, 'gtFine')
-        if self.root is None or not os.path.isdir(self.root) or not os.path.isdir(img_dir) \
-                or not os.path.isdir(label_dir):
-            raise ValueError("The dataset is not Found.")
-        self._set_files()
-
-    def _set_files(self):
-        assert (self.split in ['train', 'val'])
-        label_path = os.path.join(self.root, 'gtFine', self.split)
-        image_path = os.path.join(self.root, 'leftImg8bit', self.split)
-        assert os.listdir(image_path) == os.listdir(label_path)
-
-        image_paths = glob.glob(image_path + '/**/*.png', recursive=True)
-        label_paths = glob.glob(label_path + '/**/*gtFine_labelIds.png', recursive=True)
-        self.files = list(zip(image_paths, label_paths))
-
-    def _load_data(self, index):
-        image_path, label_path = self.files[index]
-        image = Image.open(image_path).convert('RGB')
-        label = Image.open(label_path)
-        return image, label
-
-
-
 labels = [
-    #       name                     id    trainId   category            catId     hasInstances   ignoreInEval   color
+    #       name                     id    trainId   category            catId     hasInstances   ignoreInEval   color            color_train
     Label(  'unlabeled'            ,  0 ,      255 , 'void'            , 0       , False        , True         , (  0,  0,  0) ),
     Label(  'ego vehicle'          ,  1 ,      255 , 'void'            , 0       , False        , True         , (  0,  0,  0) ),
     Label(  'rectification border' ,  2 ,      255 , 'void'            , 0       , False        , True         , (  0,  0,  0) ),
@@ -90,3 +59,35 @@ labels = [
     Label(  'bicycle'              , 33 ,       18 , 'vehicle'         , 7       , True         , False        , (119, 11, 32) ),
     Label(  'license plate'        , -1 ,       -1 , 'vehicle'         , 7       , False        , True         , (  0,  0,142) ),
 ]
+
+class Cityscapes(BaseDataSet):
+    def __init__(self, transforms, root, split='train', *args):
+        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms, labels=labels)
+        self.file_list = list()
+        self.split = split.lower()
+        self.ignore_index = 0
+        img_dir = os.path.join(self.root, 'leftImg8bit')
+        label_dir = os.path.join(self.root, 'gtFine')
+        if self.root is None or not os.path.isdir(self.root) or not os.path.isdir(img_dir) \
+                or not os.path.isdir(label_dir):
+            raise ValueError("The dataset is not Found.")
+        self._set_files()
+
+    def _set_files(self):
+        assert (self.split in ['train', 'val'])
+        label_path = os.path.join(self.root, 'gtFine', self.split)
+        image_path = os.path.join(self.root, 'leftImg8bit', self.split)
+        assert os.listdir(image_path) == os.listdir(label_path)
+
+        image_paths = glob.glob(image_path + '/**/*.png', recursive=True)
+        label_paths = glob.glob(label_path + '/**/*gtFine_labelIds.png', recursive=True)
+        self.files = list(zip(image_paths, label_paths))
+
+    def _load_data(self, index):
+        image_path, label_path = self.files[index]
+        image = Image.open(image_path).convert('RGB')
+        label = Image.open(label_path)
+        return image, label
+
+
+

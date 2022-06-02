@@ -16,14 +16,16 @@ class Transform:
                 return
         self.transforms.append(ToTensor())
 
-    def __call__(self, im, label=None):
+    def __call__(self, image, label=None):
         for transform in self.transforms:
-            outputs = transform(im, label)
-            im = outputs[0]
-            if len(outputs) == 2:
-                label = outputs[1]
-
-        return (im, label)
+            if label is None:
+                image = transform(image, label)
+            else:
+                image, label = transform(image, label)
+        if label is None:
+            return image
+        else:
+            return image, label
 
 
 class ToTensor:
@@ -34,8 +36,9 @@ class ToTensor:
         image = self.toTensor(image)
         if label is not None:
             label = torch.from_numpy(np.array(label, dtype=np.int32)).long()
-        return (image, label)
-
+            return image, label
+        else:
+            return image
 
 class Blur:
     def __init__(self):
@@ -47,7 +50,10 @@ class Blur:
         ksize = ksize + 1 if ksize % 2 == 0 else ksize
         gaussian_blur = T.GaussianBlur(ksize, sigma)
         image = gaussian_blur(image)
-        return (image, label)
+        if label is not None:
+            return image, label
+        else:
+            return image
 
 class Resize():
     def __init__(self, size=(512, 512), interpolation='LINEAR'):
@@ -69,9 +75,12 @@ class Resize():
         image = self.resizeIm(image)
         if label is not None:
             label = self.resizeLabel(label)
-        return (image, label)
+            return image, label
+        else:
+            return image
 
-class HorizontalFlip():
+
+class HorizontalFlip:
     def __init__(self, prob=0.5):
         try:
             prob = float(prob)
@@ -88,6 +97,18 @@ class HorizontalFlip():
         return image, label
 
 
+class ColorJitter:
+    def __init__(self, brightness, contrast, saturation):
+        self.color_jitter = T.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation)
+
+    def __call__(self, image, label=None, *args, **kwargs):
+        image = self.color_jitter(image)
+        if label is not None:
+            return image, label
+        else:
+            return image
+
+
 class RandomCrop():
     def __init__(self, size=(512, 512)):
         if len(size) != 2:
@@ -99,9 +120,11 @@ class RandomCrop():
         image = T.functional.crop(image, t, l, h, w)
         if label is not None:
             label = T.functional.crop(label, t, l, h, w)
-        return (image, label)
+            return image, label
+        else:
+            return image
 
-class Rotate():
+class Rotate:
     def __init__(self,  angleMax=10):
         self.angleMax = angleMax
 
@@ -110,10 +133,12 @@ class Rotate():
         image = rotate(image, angle=angle)
         if label is not None:
             label = rotate(label, angle=angle)
-        return image, label
+            return image, label
+        else:
+            return image
 
 
-class Normalize():
+class Normalize:
     def __init__(self, mean, std):
         self.mean = mean
         self.std = std
@@ -121,44 +146,8 @@ class Normalize():
 
     def __call__(self, image, label=None):
         image = self.toNormalize(image)
-        return (image, label)
+        if label is not None:
+            return image, label
+        else:
+            return image
 
-
-
-    def _val_augmentation(self, image, label):
-        if self.resize:
-            self._resize(image, label)
-        if self.crop_size:
-            image, label = self._crop(image, label)
-        return image, label
-
-    def _augmentation(self, image, label):
-        # Scaling, we set the bigger to base size, and the smaller
-        # one is rescaled to maintain the same ratio, if we don't have any obj in the image, re-do the processing
-        # Rotate the image with an angle between -10 and 10
-        if self.rotate:
-            angle = random.randint(-10, 10)
-            image = rotate(image, angle=angle)
-            label = rotate(label, angle=angle)
-
-        if self.resize:
-            self._resize(image, label)
-
-        # Padding to return the correct crop size
-        if self.crop_size:
-            image, label = self._crop(image, label)
-
-        # Random H flip
-        if self.flip:
-            if random.random() > 0.5:
-                image = hflip(image)
-                label = hflip(label)
-
-        # Gaussian Blud (sigma between 0 and 1.5)
-        if self.blur:
-            sigma = random.random()
-            ksize = int(3.3 * sigma)
-            ksize = ksize + 1 if ksize % 2 == 0 else ksize
-            gaussian_blur = T.GaussianBlur(ksize, sigma)
-            image = gaussian_blur(image)
-        return image, label
