@@ -134,19 +134,18 @@ class Trainer():
                    'train': train_log,
                    'val':  val_log}
 
-            if epoch % self.config['trainer']['val_per_epochs'] == 0:
-                self.improved = (val_log[self.metric] > best_metric)
+            self.improved = (val_log[self.metric] > best_metric)
 
-                if self.improved:
-                    self.mnt_best = val_log[self.metric]
-                    self.not_improved_count = 0
-                else:
-                    self.not_improved_count += 1
+            if self.improved:
+                self.mnt_best = val_log[self.metric]
+                self.not_improved_count = 0
+            else:
+                self.not_improved_count += 1
 
-                if self.not_improved_count > self.early_stoping:
-                    self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping} epochs')
-                    self.logger.warning('Training Stoped')
-                    break
+            if self.not_improved_count > self.early_stoping:
+                self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping} epochs')
+                self.logger.warning('Training Stoped')
+                break
             # SAVE CHECKPOINT
             if epoch % self.save_period == 0:
                 self._save_checkpoint(epoch, save_best=self.improved)
