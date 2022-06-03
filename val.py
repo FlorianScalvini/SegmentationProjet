@@ -41,13 +41,11 @@ def evaluate(model, eval_loader, num_classes, device, criterion=None, precision=
 
     class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area)
     acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)
-    kap = kappa(aInter=intersect, aPreds=pred_area, aLabels=label_area)
 
     log = {
         'miou': miou,
         'class_iou': class_iou.cpu().numpy(),
         'class_precision': class_precision.cpu().numpy(),
-        'kappa': kap
     }
     if criterion is not None:
         log['loss'] = (total_loss / (len(eval_loader) * eval_loader.loader.batch_size)).cpu().numpy()

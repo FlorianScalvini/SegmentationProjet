@@ -1,6 +1,4 @@
-import time
 from tqdm.auto import tqdm, trange
-from torch.utils.tensorboard import SummaryWriter
 import torch.utils.data
 from utils.metric import *
 from datetime import *
@@ -10,7 +8,7 @@ from utils.loss import loss_computation
 import os
 import logging
 from val import evaluate
-
+import utils.helpers as helpers
 
 class Trainer():
     def __init__(self, model, loss, optimizer, scheduler, train_loader, lossCoef, val_loader=None,
@@ -36,8 +34,8 @@ class Trainer():
         self.device = self._get_available_devices(device)
         self.model.to(self.device)
         self.scaler = None
-        self.save_dir = save_dir + datetime.now().strftime("%m_%d__%H_%M_%S") + "//"
-
+        self.save_dir = save_dir + datetime.now().strftime("%m_%d-%H%M_%S") + "//"
+        helpers.create_path(self.save_dir)
 
         self.ignore_labels = 255
         if self.device ==  torch.device('cpu'): prefetch = False
@@ -103,13 +101,11 @@ class Trainer():
         # RETURN LOSS & METRICS
         class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)
-        kap = kappa(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         log = {
             'loss': (total_loss / (len(self.train_loader) * self.train_loader.loader.batch_size)).item(),
             'miou': miou,
             'class_iou': class_iou.cpu().numpy(),
             'class_precision': class_precision.cpu().numpy(),
-            'kappa': kap
         }
         return log
 
@@ -117,7 +113,6 @@ class Trainer():
     def train(self):
         self.mnt_best = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
-            self._save_checkpoint(epoch, save_best=True)
             train_log = self._train_epoch()
             val_log = evaluate(model=self.model, eval_loader=self.val_loader, device=self.device,
                                num_classes=self.val_loader.dataset.num_classes, criterion=self.criterion,

@@ -5,9 +5,12 @@ import numpy as np
 import math
 import PIL
 
-def dir_exists(path):
+def create_path(path):
     if not os.path.exists(path):
             os.makedirs(path)
+            print("The path is created")
+    else:
+        print("The path was already created")
 
 def colorize_mask(mask, palette):
     zero_pad = 256 * 3 - len(palette)

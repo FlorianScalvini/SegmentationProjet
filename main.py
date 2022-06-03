@@ -1,7 +1,3 @@
-import torch.utils.data
-import torchvision.models as models
-import torch.nn as nn
-import numpy as np
 import config
 from train import Trainer
 import models

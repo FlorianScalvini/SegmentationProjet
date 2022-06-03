@@ -1,4 +1,5 @@
 import torch
+import torchvision.transforms
 from torchvision import transforms as T
 from torchvision.transforms.functional import hflip, rotate, InterpolationMode
 import random
@@ -109,7 +110,28 @@ class ColorJitter:
             return image
 
 
-class RandomCrop():
+class RandomScale:
+    def __init__(self, min=0.5, max=2):
+        if max < min:
+            raise ValueError('RandomScale : Maximum value is lower than minimum value')
+        self.min = min
+        self.max = max
+
+    def __call__(self, image, label, *args, **kwargs):
+        w, h = image.size
+        scale = random.uniform(self.min, self.max)
+        w_new, h_new = int(w*scale), int(h*scale)
+        img_resize = torchvision.transforms.Resize((w_new, h_new), InterpolationMode.BILINEAR)
+        image = img_resize(img_resize)
+        if label is not None:
+            lbl_resize = torchvision.transforms.Resize((w_new, h_new), InterpolationMode.NEAREST)
+            label = lbl_resize(label)
+            return image, label
+        else:
+            return image
+
+
+class RandomCrop:
     def __init__(self, size=(512, 512)):
         if len(size) != 2:
             raise ValueError("Size invalid")
@@ -123,6 +145,7 @@ class RandomCrop():
             return image, label
         else:
             return image
+
 
 class Rotate:
     def __init__(self,  angleMax=10):
