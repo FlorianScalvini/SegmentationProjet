@@ -27,9 +27,8 @@ class Trainer():
         self.start_epoch = 1
         self.early_stoping = early_stopping
         self.metric = 'miou'
-        if val_loader is not None:
-            self.val_per_epochs = val_per_epochs
         self.save_period = 10
+        self.not_improved_count = 0
         self.improved = False
         self.logger = logging.getLogger(self.__class__.__name__)
         self.epochs = epochs
@@ -37,10 +36,9 @@ class Trainer():
         self.device = self._get_available_devices(device)
         self.model.to(self.device)
         self.scaler = None
-        self.save_dir = save_dir + datetime.now().strftime("%m_%d__%H_%M_%S") + "/"
-        self.total_loss = 0.
-        self.total_inter, self.total_union = 0, 0
-        self.total_correct, self.total_label = 0, 0
+        self.save_dir = save_dir + datetime.now().strftime("%m_%d__%H_%M_%S") + "//"
+
+
         self.ignore_labels = 255
         if self.device ==  torch.device('cpu'): prefetch = False
         self.precision = 'fp32'
@@ -70,7 +68,6 @@ class Trainer():
     def _train_epoch(self, epoch=None):
         num_classes = self.model.num_classes
         self.model.train()
-        self._reset_metrics()
         total_loss = 0.0
         intersect = torch.zeros(num_classes).to(self.device)
         pred_area = torch.zeros(num_classes).to(self.device)
@@ -108,59 +105,43 @@ class Trainer():
         acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         kap = kappa(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         log = {
-            'loss': self.total_loss / (len(self.train_loader) * self.train_loader.loader.batch_size),
+            'loss': (total_loss / (len(self.train_loader) * self.train_loader.loader.batch_size)).item(),
             'miou': miou,
-            'class_iou': class_iou,
-            'class_precision': class_precision,
+            'class_iou': class_iou.cpu().numpy(),
+            'class_precision': class_precision.cpu().numpy(),
             'kappa': kap
         }
         return log
 
 
     def train(self):
-        best_metric = 0
+        self.mnt_best = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
+            self._save_checkpoint(epoch, save_best=True)
             train_log = self._train_epoch()
             val_log = evaluate(model=self.model, eval_loader=self.val_loader, device=self.device,
                                num_classes=self.val_loader.dataset.num_classes, criterion=self.criterion,
                                precision=self.precision, print_detail=False)
             self.scheduler.step(val_log['loss'])
-            # LOGGING INFO
-            self.logger.info(f'\n ## Info for epoch {epoch} ## ')
-            for k, v in train_log.items():
-                self.logger.info(f'         {str(k):15s}: {v}')
-
             log = {'epoch': epoch,
                    'train': train_log,
                    'val':  val_log}
+            print(f"Epoch :{epoch} \n Train : {log['train']} \n {log['val']}")
+            self.improved = (val_log[self.metric] > self.mnt_best)
 
-            self.improved = (val_log[self.metric] > best_metric)
 
             if self.improved:
                 self.mnt_best = val_log[self.metric]
                 self.not_improved_count = 0
             else:
                 self.not_improved_count += 1
-
-            if self.not_improved_count > self.early_stoping:
-                self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping} epochs')
-                self.logger.warning('Training Stoped')
-                break
+                if self.early_stoping is not None and self.not_improved_count > self.early_stoping:
+                    print(f'\nPerformance didn\'t improve for {self.early_stoping} epochs')
+                    print('Training Stoped')
+                    break
             # SAVE CHECKPOINT
-            if epoch % self.save_period == 0:
+            if self.improved:
                 self._save_checkpoint(epoch, save_best=self.improved)
-
-    def _update_seg_metrics(self, correct, labeled, inter, union):
-        self.total_correct += correct
-        self.total_label += labeled
-        self.total_inter += inter
-        self.total_union += union
-
-    def _reset_metrics(self):
-        self.total_loss = 0.
-        self.total_inter, self.total_union = 0, 0
-        self.total_correct, self.total_label = 0, 0
-
 
     def _save_checkpoint(self, epoch, save_best=False):
         state = {
@@ -171,13 +152,13 @@ class Trainer():
             'monitor_best': self.mnt_best
         }
         filename = os.path.join(self.save_dir, f'checkpoint-epoch{epoch}.pth')
-        self.logger.info(f'\nSaving a checkpoint: {filename} ...')
+        print(f'\nSaving a checkpoint: {filename} ...')
         torch.save(state, filename)
 
         if save_best:
             filename = os.path.join(self.save_dir, f'best_model.pth')
             torch.save(state, filename)
-            self.logger.info("Saving current best: best_model.pth")
+            print("Saving current best: best_model.pth")
 
 
     def _resume_checkpoint(self, resume_path):
@@ -191,4 +172,4 @@ class Trainer():
         self.model.load_state_dict(checkpoint['state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer'])
 
-        self.logger.info(f'Checkpoint <{resume_path}> (epoch {self.start_epoch}) was loaded')
+        print(f'Checkpoint <{resume_path}> (epoch {self.start_epoch}) was loaded')

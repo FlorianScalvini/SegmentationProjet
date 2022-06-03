@@ -39,9 +39,9 @@ def meanIoU(aInter, aPreds, aLabels):
 
 def calculate_hist(prediction, target, num_classes, ignore_labels=None):
     if ignore_labels is None:
-        intersection = (prediction == target) * prediction
+        intersection = prediction[prediction == target]
     else:
-        intersection = (target != ignore_labels) * (prediction == target) * prediction
+        intersection = prediction[torch.logical_and(prediction == target, ignore_labels!=target)]
     preds_intersection = torch.histc(intersection, bins=num_classes, min=0, max=num_classes-1)
     preds_hist= torch.histc(prediction, bins=num_classes, min=0, max=num_classes-1)
     target_hist = torch.histc(target, bins=num_classes, min=0, max=num_classes-1)
