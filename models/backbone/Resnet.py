@@ -12,6 +12,25 @@ model_urls = {
     "resnet152": "https://download.pytorch.org/models/resnet152-394f9c45.pth"
 }
 
+def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
+    """3x3 convolution with padding"""
+    return nn.Conv2d(
+        in_planes,
+        out_planes,
+        kernel_size=3,
+        stride=stride,
+        padding=dilation,
+        groups=groups,
+        bias=False,
+        dilation=dilation,
+    )
+
+
+def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
+    """1x1 convolution"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
+
+
 class Resnet(nn.Module):
     def __init__(self, block, layers=None, pretrained=False, num_classes=1000, groups=1, width_per_group=64):
         super(Resnet, self).__init__()
@@ -34,16 +53,8 @@ class Resnet(nn.Module):
         self.fc = nn.Linear(512 * block.expansion, num_classes)
         if pretrained is not None:
             # Mapping Pytorch Resnet with this Resnet implementation
-            pretrained = torch.load(pretrained)
-            new = list(pretrained.items())
-            mdl = self.state_dict()
-            count = 0
-            for key, value in mdl.items():
-                layer_name, weights = new[count]
-                mdl[key] = weights
-                count += 1
-            self.load_state_dict(mdl)
-            torch.save(self.state_dict(),"/Users/florianscalvini/PycharmProjects/SegmentationProjet/model.pt")
+            state_dict = torch.load(pretrained)
+            self.load_state_dict(state_dict)
         else:
             self._init_weight()
 
@@ -131,56 +142,50 @@ class Bottleneck(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, downsample=None, groups: int = 1,
                  base_width: int = 64, dilation=1):
         super(Bottleneck, self).__init__()
-        width = int(in_channels * (base_width / 64.0)) * groups
-        self.conv1 = ConvBN(in_channels=in_channels, out_channels=width, kernel_size=1, bias=False)
-        self.conv2 = ConvBN(in_channels=in_channels, out_channels=width, kernel_size=3,
-                            stride=stride, groups=groups, padding=dilation, bias=False)
-        self.conv3 = ConvBN(in_channels=width, out_channels=out_channels * self.expansion, kernel_size=1, bias=False)
+        width = int(out_channels * (base_width / 64.0)) * groups
+        norm_layer = nn.BatchNorm2d
+        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = ConvBNRelu(in_channels=in_channels, out_channels=width, kernel_size=1, stride=1, bias=False)
+        self.conv2 = ConvBNRelu(in_channels=width, out_channels=width, kernel_size=3, stride=stride, groups=groups,
+                                padding=dilation, dilation=dilation, bias=False)
+        self.conv3 = ConvBN(in_channels=width, out_channels=out_channels * self.expansion, kernel_size=1, stride=1, bias=False)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
-        self.stride = stride
+
 
     def forward(self, x):
-        y = self.conv1(x)
-        y = self.conv2(y)
-        y = self.conv3(y)
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out = self.conv3(out)
         if self.downsample is not None:
             x = self.downsample(x)
-        y += x
-        y = self.relu(y)
-        return y
+        out += x
+        out = self.relu(out)
 
+        return out
 
 def Resnet18(pretrained=False):
-    if pretrained:
-        pretrained = load_from_url("https://download.pytorch.org/models/resnet18-f37072fd.pth")
     return Resnet(block=BasicBlock, layers=[2,2,2,2], pretrained=pretrained)
 
 def Resnet34(pretrained=False):
-    if pretrained:
-        pretrained = load_from_url("https://download.pytorch.org/models/resnet34-b627a593.pth")
     return Resnet(block=BasicBlock, layers=[3,4,6,3], pretrained=pretrained)
 
 def Resnet50(pretrained=False):
-    if pretrained:
-        pretrained = load_from_url("https://download.pytorch.org/models/resnet50-0676ba61.pth")
-    return Resnet(block=BasicBlock, layers=[3,4,6,3], pretrained=pretrained)
+    return Resnet(block=Bottleneck, layers=[3,4,6,3], pretrained=pretrained)
 
 def Resnet101(pretrained=False):
-    if pretrained:
-        pretrained = load_from_url("https://download.pytorch.org/models/resnet101-63fe2227.pth")
-    return Resnet(block=BasicBlock, layers=[3,4,23,3], pretrained=pretrained)
+    return Resnet(block=Bottleneck, layers=[3,4,23,3], pretrained=pretrained)
 
 def Resnet152(pretrained=False):
-    if pretrained:
-        pretrained = load_from_url("https://download.pytorch.org/models/resnet152-394f9c45.pth")
-    return Resnet(block=BasicBlock, layers=[3,8,36,3], pretrained=pretrained)
+    return Resnet(block=Bottleneck, layers=[3,8,36,3], pretrained=pretrained)
 
 
 if __name__ == "__main__":
-    d = torchvision.models.resnet18(pretrained=True)
-    torch.save(d.state_dict(), '/Users/florianscalvini/PycharmProjects/SegmentationProjet/bac.pt')
-    c = Resnet18("/Users/florianscalvini/PycharmProjects/SegmentationProjet/pretrained/resnet/resnet18-f37072fd.pth")
+    num = 152
+    d = torchvision.models.resnet152(pretrained=True)
+    torch.save(d.state_dict(), '/Users/florianscalvini/PycharmProjects/SegmentationProjet/pretrained/resnet/resnet'+ str(num) + '.pth')
+    c = Resnet152("/Users/florianscalvini/PycharmProjects/SegmentationProjet/pretrained/resnet/resnet"+ str(num) + ".pth")
+    torch.save(c.state_dict(), '/Users/florianscalvini/PycharmProjects/SegmentationProjet/pretrained/resnet/resnet'+ str(num) + '.pth')
     a  = torch.rand((1,3,224,224))
     p = d(a)
     b = c(a)

@@ -3,9 +3,10 @@ import torch
 
 
 class ConvBNA(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, bias=True,  activation=None, groups=1):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, bias=True,
+                 activation=None, groups=1, dilation=1):
         super(ConvBNA, self).__init__()
-        self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels,kernel_size=kernel_size, stride=stride, padding=padding, bias=bias, groups=groups)
+        self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels,kernel_size=kernel_size, stride=stride, padding=padding, bias=bias, groups=groups, dilation=dilation)
         self.bn = nn.BatchNorm2d(num_features=out_channels)
         self.act = activation
         return
@@ -25,10 +26,14 @@ class ConvBNA(nn.Module):
 
 
 class ConvBN(ConvBNA):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, groups=1, bias=True):
-        super(ConvBN, self).__init__(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias, activation=None, groups=groups)
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, groups=1, dilation=1, bias=True):
+        super(ConvBN, self).__init__(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
+                                     stride=stride, padding=padding, bias=bias, activation=None,
+                                     groups=groups, dilation=dilation)
 
 
 class ConvBNRelu(ConvBNA):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, groups=1, bias=True):
-        super(ConvBNRelu, self).__init__(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias, activation=nn.ReLU(), groups=groups)
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, groups=1, bias=True, dilation=1):
+        super(ConvBNRelu, self).__init__(in_channels=in_channels, out_channels=out_channels,
+                                         kernel_size=kernel_size, stride=stride, padding=padding,
+                                         bias=bias, activation=nn.ReLU(), groups=groups, dilation=dilation)
