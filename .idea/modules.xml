@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/../ProjetProgrammation/.idea/ProjetProgrammation.iml" filepath="$PROJECT_DIR$/../ProjetProgrammation/.idea/ProjetProgrammation.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/SegmentationProjet.iml" filepath="$PROJECT_DIR$/.idea/SegmentationProjet.iml" />
+    </modules>
+  </component>
+</project>

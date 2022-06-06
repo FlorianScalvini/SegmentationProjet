@@ -4,6 +4,7 @@ import torch.nn as nn
 import numpy as np
 import math
 import PIL
+import requests
 
 def create_path(path):
     if not os.path.exists(path):
@@ -19,3 +20,8 @@ def colorize_mask(mask, palette):
     new_mask = PIL.Image.fromarray(mask.astype(np.uint8)).convert('P')
     new_mask.putpalette(palette)
     return new_mask
+
+def load_from_url(path):
+    response = requests.get(path)
+    state_dict = response.content
+    return state_dict
