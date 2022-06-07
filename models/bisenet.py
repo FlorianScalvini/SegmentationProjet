@@ -1,7 +1,7 @@
 import torch.nn.functional
 from BaseModel import BaseModel
 from models.module import *
-
+from models.module
 
 class Bisenet(BaseModel):
     def __init__(self, num_classes, pretrained=None, lambd=0.25, align_corners=True, *args, **kwargs):
@@ -10,7 +10,8 @@ class Bisenet(BaseModel):
 class ContextPath(nn.Module):
     def __init__(self, backbone):
         super(ContextPath, self).__init__()
-        self.backbone = backbone
+        if backbone == "resnet18":
+            self.backbone = backbone
         self.b
 
 class SpatialPath(nn.Module):

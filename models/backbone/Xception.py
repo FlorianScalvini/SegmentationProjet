@@ -20,13 +20,21 @@ class Xception(nn.Module):
         self.block9 = Block(in_channels=728, out_channels=728, reps=3, start_relu=True, skip_conv=False)
         self.block10 = Block(in_channels=728, out_channels=728, reps=3, start_relu=True, skip_conv=False)
         self.block11 = Block(in_channels=728, out_channels=728, reps=3, start_relu=True, skip_conv=False)
-        self.block12 = Block(in_channels=728, out_channels=1024, reps=2, start_relu=True, skip_conv=True, late=True)
+        self.block12 = nn.Sequential(
+            nn.ReLU(),
+            SeparableConv2d(in_channels=728, out_channels=728),
+            nn.BatchNorm2d(num_features=728),
+            nn.ReLU(),
+            SeparableConv2d(in_channels=728, out_channels=1024),
+            nn.BatchNorm2d(num_features=1024),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        )
+        self.block12_skip = ConvBN(in_channels=728, out_channels=1024, kernel_size=1, stride=2, bias=False)
         self.sepbn = nn.Sequential(
             SeparableConv2d(in_channels=1024, out_channels=1536),
             nn.BatchNorm2d(num_features=1536),
             nn.ReLU()
         )
-
         self.sepbn1 = nn.Sequential(
             SeparableConv2d(in_channels=1536, out_channels=2048),
             nn.BatchNorm2d(num_features=2048),
@@ -35,8 +43,7 @@ class Xception(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1,1))
         self.linear = nn.Linear(in_features=2048, out_features=num_classes)
 
-
-    def forward(self, x):
+    def forward(self, x, backbone=True):
         y = self.conv(x)
         y = self.conv1(y)
         y = self.block(y)
@@ -50,12 +57,16 @@ class Xception(nn.Module):
         y = self.block9(y)
         y = self.block10(y)
         y = self.block11(y)
-        y = self.block12(y)
+        y_16 = self.block12(y)
+        y = self.block12_skip(y) + y_16
         y = self.sepbn(y)
-        y = self.sepbn1(y)
-        return y
-
-
+        y_32 = self.sepbn1(y)
+        y_global = self.avgpool(y_32)
+        if backbone:
+            return y_16, y_32, y_global
+        else:
+            y = self.linear(y_global)
+            return y
 
 
 
@@ -71,12 +82,11 @@ class SeparableConv2d(nn.Module):
         return y
 
 class Block(nn.Module):
-    def __init__(self, in_channels, out_channels, reps=3, skip_conv=True, start_relu=True, late=False):
+    def __init__(self, in_channels, out_channels, reps=3, skip_conv=True, start_relu=True):
         super(Block, self).__init__()
         self.start_relu = start_relu
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.late = late
         self.reps = reps
         self.skip_conv = skip_conv
         self.layers = self._make_block()
@@ -87,17 +97,12 @@ class Block(nn.Module):
         layers = []
         if self.start_relu:
             layers.append(nn.ReLU())
-        if not self.late:
-            layers.append(SeparableConv2d(in_channels=self.in_channels, out_channels=self.out_channels))
-            layers.append(nn.BatchNorm2d(self.out_channels))
-            chl = self.out_channels
-        else:
-            layers.append(SeparableConv2d(in_channels=self.in_channels, out_channels=self.in_channels))
-            layers.append(nn.BatchNorm2d(self.in_channels))
-            chl = self.in_channels
+        layers.append(SeparableConv2d(in_channels=self.in_channels, out_channels=self.out_channels))
+        layers.append(nn.BatchNorm2d(self.out_channels))
+
         for i in range(self.reps-1):
             layers.append(nn.ReLU())
-            layers.append(SeparableConv2d(in_channels=chl, out_channels=self.out_channels))
+            layers.append(SeparableConv2d(in_channels=self.out_channels, out_channels=self.out_channels))
             layers.append(nn.BatchNorm2d(self.out_channels))
         if self.skip_conv:
             layers.append(nn.MaxPool2d(kernel_size=3, stride=2, padding=1))
