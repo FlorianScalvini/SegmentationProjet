@@ -122,7 +122,7 @@ class RandomScale:
         scale = random.uniform(self.min, self.max)
         w_new, h_new = int(w*scale), int(h*scale)
         img_resize = torchvision.transforms.Resize((w_new, h_new), InterpolationMode.BILINEAR)
-        image = img_resize(img_resize)
+        image = img_resize(image)
         if label is not None:
             lbl_resize = torchvision.transforms.Resize((w_new, h_new), InterpolationMode.NEAREST)
             label = lbl_resize(label)

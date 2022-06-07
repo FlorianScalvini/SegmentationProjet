@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from models.module import ConvBNRelu
 from torchsummary import summary
 from models import BaseModel
-from itertools import chain
 
 
 class UNet(BaseModel):
@@ -14,7 +14,7 @@ class UNet(BaseModel):
         self.block2 = conv3x3_block_x2(64, 128)
         self.block3 = conv3x3_block_x2(128, 256)
         self.block4 = conv3x3_block_x2(256, 512)
-        self.block_out = conv3x3_block_x1(512, 1024)
+        self.block_out = ConvBNRelu(512, 1024, padding=1)
         self.upsample1 = upsample(1024, 512)
         self.upsample2 = upsample(512, 256)
         self.upsample3 = upsample(256, 128)
@@ -63,7 +63,7 @@ class conv3x3_block_x2(nn.Module):
 class upsample(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(upsample, self).__init__()
-        self.conv1x1 = nn.Conv2d(in_ch, out_ch, kernel_size=1, stride=stride, bias=False) conv1x1(in_ch, out_ch)
+        self.conv1x1 = nn.Conv2d(in_ch, out_ch, kernel_size=1, stride=1, bias=False)
         self.conv = conv3x3_block_x2(in_ch, out_ch)
 
     def forward(self, H, L):

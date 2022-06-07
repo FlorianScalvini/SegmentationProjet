@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+from models.module.convBnRelu import ConvBN
 class Xception(nn.Module):
     def __init__(self, num_classes=1000):
         super(Xception, self).__init__()
@@ -9,16 +9,15 @@ class Xception(nn.Module):
         self.bn1 = nn.BatchNorm2d(32)
         self.relu = nn.ReLU(inplace=True)
 
-        self.conv2 = nn.Conv2d(32,64,3,bias=False)
-        self.bn2 = nn.BatchNorm2d(64)
+        self.block =
 
     def forward(self, x):
 
 
 
-class SeperableConv(nn.Module):
+class SeparableConv2d(nn.Module):
     def __init__(self, in_channels,out_channels,kernel_size=3,stride=1,padding=0,dilation=1,bias=False):
-        super(SeperableConv, self).__init__()
+        super(SeparableConv2d, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size, stride, padding, dilation, groups=in_channels, bias=bias)
         self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, 1, 1, bias=bias)
 
@@ -27,35 +26,40 @@ class SeperableConv(nn.Module):
         y = self.pointwise(y)
         return y
 
-class MiddleFlow(nn.Module):
-    def __init__(self, channels, number=8):
-        super(MiddleFlow, self).__init__()
-        self.channels = channels
-        self.number = number
-        self.block = self._makeblock()
+class Block(nn.Module):
+    def __init__(self, in_channels, out_channels, reps=3, skip=True, skip_conv=True, start_relu=True):
+        super(Block, self).__init__()
+        self.skip = ConvBN(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=2)
+        self.relu = nn.ReLU()
+        self.start_relu = start_relu
+        self.skip_conv = skip_conv
+        self.skip = skip
+        self.skip_layers = ConvBN(in_channels=in_channels, out_channels=out_channels, kernel_size=1, stride=2, bias=False)
+        self.reps = reps
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.layers = self._make_block()
 
-    def _makeblock(self):
+    def _make_block(self):
         layers = []
-        for i in range(3):
-            layers.append(nn.Sequential(
-                nn.ReLU(),
-                SeperableConv(in_channels=self.channels, out_channels=self.channels),
-                nn.BatchNorm2d(num_features=self.channels)
-            ))
+        if self.start_relu:
+            layers.append(self.relu)
+        layers.append(SeparableConv2d(in_channels=self.in_channels, out_channels=self.out_channels))
+        layers.append(nn.BatchNorm2d(self.out_channels))
+        for i in range(self.reps-1):
+            layers.append(self.relu)
+            layers.append(SeparableConv2d(in_channels=self.in_channels, out_channels=self.out_channels))
+            layers.append(nn.BatchNorm2d(self.out_channels))
+        if self.skip_conv:
+            layers.append(nn.MaxPool2d(kernel_size=3, stride=2, padding=1))
+        return nn.Sequential(*layers)
 
     def forward(self, x):
-        for
+        idn = x
+        y = self.layers(idn)
+        if self.skip:
+            if self.skip_conv:
+                idn = self.skip_layers(idn)
+            y += idn
         return y
 
-class Block2RS_M(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(Block2RS_M, self).__init__()
-        self.sep1 = SeperableConv(in_channels=in_channels, out_channels=out_channels)
-        self.bn1 = nn.BatchNorm2d(num_features=out_channels)
-        self.sep2 = SeperableConv(in_channels=out_channels, out_channels=out_channels)
-        self.bn2 = nn.BatchNorm2d(num_features=out_channels)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2)
-        self.relu = nn.ReLU()
-        self.conv = nn.C
-
-    def forward(self, x):

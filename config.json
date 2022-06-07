@@ -29,7 +29,10 @@
             "args": {
                 "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest",
                 "transforms": {
-                    "Resize": [2048,1024],
+                    "RandomScale": {
+                        "min": 0.5,
+                        "max": 2
+                    },
                     "RandomCrop": [1024,512],
                     "ColorJitter": {
                         "brightness" : 0.5,
@@ -83,7 +86,7 @@
         "type": "SGD",
         "differential_lr": true,
         "args":{
-            "lr": 0.01,
+            "lr": 0.001,
             "weight_decay": 5e-4
         }
     },
