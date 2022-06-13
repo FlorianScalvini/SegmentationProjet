@@ -37,3 +37,4 @@ class ConvBNRelu(ConvBNA):
         super(ConvBNRelu, self).__init__(in_channels=in_channels, out_channels=out_channels,
                                          kernel_size=kernel_size, stride=stride, padding=padding,
                                          bias=bias, activation=nn.ReLU(), groups=groups, dilation=dilation)
+

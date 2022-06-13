@@ -12,7 +12,7 @@ def loss_computation(logits_list, labels, criterion, coef):
     loss = 0
     for i in range(len(logits_list)):
         logits = logits_list[i]
-        loss += criterion(logits, labels) * coef[i]
+        loss += criterion(logits, labels)
     return loss
 
 
