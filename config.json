@@ -28,6 +28,7 @@
             "split": "train",
             "args": {
                 "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest",
+                "split": "val",
                 "transforms": {
                     "RandomScale": {
                         "min": 0.5,
@@ -86,7 +87,7 @@
         "type": "SGD",
         "differential_lr": true,
         "args":{
-            "lr": 0.001,
+            "lr": 0.01,
             "weight_decay": 5e-4
         }
     },
