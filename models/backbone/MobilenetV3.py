@@ -40,13 +40,15 @@ class MobilenetV3(nn.Module):
             InvertedResidual(in_channels=160, out_channels=160, exp_channels=960, kernel_size=5, strideDW=1, se=True, activation="HS"),
             ConvBNActivation(in_channels=160, out_channels=960, stride=1, kernel_size=1, bias=False, activation=nn.Hardswish())
         )
-        self.classifier = nn.Sequential(
-            nn.AdaptiveAvgPool2d(output_size=1),
-            nn.Linear(in_features=576, out_features=1280, bias=True),
-            nn.Hardswish(),
-            nn.Dropout(p=0.2, inplace=True),
-            nn.Linear(in_features=1280, out_features=self.num_classes, bias=False)
-        )
+
+        #self.classifier = nn.Sequential(
+        #    nn.AdaptiveAvgPool2d(output_size=1),
+        #    nn.Linear(in_features=576, out_features=1280, bias=True),
+        #    nn.Hardswish(),
+        #    nn.Dropout(p=0.2, inplace=True),
+        #    nn.Linear(in_features=1280, out_features=self.num_classes, bias=False)
+        #)
+
 
     def _smallNetwork(self):
         self.features = nn.Sequential(
@@ -64,13 +66,15 @@ class MobilenetV3(nn.Module):
             InvertedResidual(in_channels=96, out_channels=96, exp_channels=576, kernel_size=5, strideDW=1, se=True, activation="HS"),
             ConvBNActivation(in_channels=96, out_channels=576, stride=1, kernel_size=1, bias=False, activation=nn.Hardswish())
         )
-        self.classifier = nn.Sequential(
-            nn.AdaptiveAvgPool2d(output_size=1),
-            nn.Linear(in_features=576, out_features=1024, bias=True),
-            nn.Hardswish(),
-            nn.Dropout(p=0.2, inplace=True),
-            nn.Linear(in_features=1024, out_features=self.num_classes, bias=True)
-        )
+
+
+        #self.classifier = nn.Sequential(
+        #    nn.AdaptiveAvgPool2d(output_size=1),
+        #    nn.Linear(in_features=576, out_features=1024, bias=True),
+        #    nn.Hardswish(),
+        #    nn.Dropout(p=0.2, inplace=True),
+        #    nn.Linear(in_features=1024, out_features=self.num_classes, bias=True)
+        #)
 
 
 class InvertedResidual(nn.Module):

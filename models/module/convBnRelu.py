@@ -24,7 +24,6 @@ class ConvBNActivation(nn.Module):
                 nn.init.kaiming_normal_(ly.weight, a=1)
                 if not ly.bias is None: nn.init.constant_(ly.bias, 0)
 
-
 class ConvBN(ConvBNActivation):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, groups=1, dilation=1, bias=True):
         super(ConvBN, self).__init__(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
