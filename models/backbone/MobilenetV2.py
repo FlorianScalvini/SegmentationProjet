@@ -35,8 +35,6 @@ class MobilenetV2(nn.Module):
         return y
 
 
-
-
 class InvertedResidual(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, expansion=1):
         super(InvertedResidual, self).__init__()
