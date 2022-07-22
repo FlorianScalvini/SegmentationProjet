@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import math
 from models.module import *
+from Backbone import Backbone
 
 
-class STDC(nn.Module):
+class STDC(Backbone):
     def __init__(self,
                  base=64,
                  layers=None,
@@ -12,7 +13,7 @@ class STDC(nn.Module):
                  type="cat",
                  use_conv_last=False,
                  pretrained=None):
-        super(STDC, self).__init__()
+        super(Backbone, self).__init__()
         if layers is None:
             layers = [4, 5, 3]
         self.pretrained = pretrained
@@ -43,26 +44,6 @@ class STDC(nn.Module):
             self.feat[-1] = self.conv_last(self.feat[-1])
         return tuple(self.feat)
 
-
-    def init_weight(self):
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, std=0.001)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-        if self.pretrained is not None:
-            state_dict = torch.load(self.pretrained)["state_dict"]
-            self_state_dict = self.state_dict()
-            for k, v in state_dict.items():
-                self_state_dict.update({k: v})
-            self.load_state_dict(self_state_dict)
 
     def _make_layers(self, base, layers, block_num, block):
         features = []

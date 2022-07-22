@@ -3,9 +3,9 @@ import torchvision
 import torch.nn as nn
 from models.module.convBnRelu import ConvBNRelu, ConvBN
 from utils.helpers import load_from_url
+from Backbone import Backbone
 
-
-class Resnet(nn.Module):
+class Resnet(Backbone):
     def __init__(self, block, layers=None, pretrained=False, num_classes=1000, groups=1, width_per_group=64,
                  backbone=False):
         super(Resnet, self).__init__()
@@ -25,8 +25,12 @@ class Resnet(nn.Module):
         self.layer2 = self._make_layer(block=block, planes=128, blocks=layers[1], stride=2)
         self.layer3 = self._make_layer(block=block, planes=256, blocks=layers[2], stride=2)
         self.layer4 = self._make_layer(block=block, planes=512, blocks=layers[3], stride=2)
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+
+        self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Linear(512 * block.expansion, num_classes)
+        )
+
         if pretrained is not False:
             # Mapping Pytorch Resnet with this Resnet implementation
             state_dict = torch.load(pretrained)

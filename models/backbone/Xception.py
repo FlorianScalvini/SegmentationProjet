@@ -7,6 +7,7 @@ class Xception(nn.Module):
     def __init__(self, num_classes=1000):
         super(Xception, self).__init__()
         self.num_classes = num_classes
+        self.backbone = True
         self.conv = ConvBNRelu(3, 32, 3, 2, 0, bias=False)
         self.conv1 = ConvBNRelu(32, 64, 3, bias=False)
         self.block = Block(in_channels=64, out_channels=128, reps=2, start_relu=False, skip_conv=True)
@@ -43,7 +44,7 @@ class Xception(nn.Module):
         self.avgpool = nn.AdaptiveAvgPool2d((1,1))
         self.linear = nn.Linear(in_features=2048, out_features=num_classes)
 
-    def forward(self, x, backbone=True):
+    def forward(self, x):
         y = self.conv(x)
         y = self.conv1(y)
         y = self.block(y)
@@ -62,7 +63,7 @@ class Xception(nn.Module):
         y = self.sepbn(y)
         y_32 = self.sepbn1(y)
         y_global = self.avgpool(y_32)
-        if backbone:
+        if self.backbone:
             return y_16, y_32, y_global
         else:
             y = self.linear(y_global)

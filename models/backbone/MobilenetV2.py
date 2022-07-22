@@ -1,5 +1,6 @@
 import torch.nn as nn
 from models.module.convBnRelu import ConvBNActivation, ConvBN
+from Backbone import Backbone
 
 def _make_divisible(v, divisor):
     new_v = max(divisor, int(v + divisor / 2) // divisor * divisor)
@@ -9,9 +10,9 @@ def _make_divisible(v, divisor):
     return new_v
 
 
-class MobilenetV2(nn.Module):
+class MobilenetV2(Backbone):
 
-    def __init__(self, width_mult=1.0, min_channel=16):
+    def __init__(self, width_mult=1.0, min_channel=16, num_classes=1000):
         super(MobilenetV2, self).__init__()
         self.min_channel = min_channel
         self.width_mult = width_mult
@@ -69,26 +70,32 @@ class MobilenetV2(nn.Module):
             InvertedResidual(in_channels=in_chls, out_channels=chls, strideDW=1, expansion=6)
         )
 
+        in_chls = chls
+        chls = self._makeChl(1280)
+        self.classifier = nn.Sequential(
+            ConvBNActivation(in_channels=in_chls, out_channels=chls, stride=1, kernel_size=1, bias=False, activation=nn.ReLU6(inplace=True)),
+            nn.Dropout(p=0.2, inplace=False),
+            nn.Linear(in_features=chls, out_features=num_classes)
+        )
+
     def _makeChl(self, channels):
         min_channel = min(channels, self.min_channel)
         return max(min_channel, int(channels * self.width_mult))
 
     def forward(self, x):
-        if
         feat_list = []
-        feature_1_2 = self.stage0(x)
-        feature_1_2 = self.stage1(feature_1_2)
-        feature_1_4 = self.stage2(feature_1_2)
-        feature_1_8 = self.stage3(feature_1_4)
-        feature_1_16 = self.stage4(feature_1_8)
-        feature_1_16 = self.stage5(feature_1_16)
-        feature_1_32 = self.stage6(feature_1_16)
-        feature_1_32 = self.stage7(feature_1_32)
-        feat_list.append(feature_1_4)
-        feat_list.append(feature_1_8)
-        feat_list.append(feature_1_16)
-        feat_list.append(feature_1_32)
-        return feat_list
+        feature_2 = self.stage0(x)
+        feature_2 = self.stage1(feature_2)
+        feature_4 = self.stage2(feature_2)
+        feature_8 = self.stage3(feature_4)
+        feature_16 = self.stage4(feature_8)
+        feature_16 = self.stage5(feature_16)
+        feature_32 = self.stage6(feature_16)
+        feature_32 = self.stage7(feature_32)
+        if self._backbone:
+            return feature_4, feature_8, feature_16, feature_32
+        else:
+            return self.classifier(feature_32)
 
 
 class InvertedResidual(nn.Module):
@@ -106,7 +113,6 @@ class InvertedResidual(nn.Module):
                                        stride=self.strideDW, padding=1, bias=False))
         layers.append(ConvBN(in_channels=in_channels*expansion, out_channels=out_channels, kernel_size=1, stride=1, bias=False))
         self.block = nn.Sequential(*layers)
-        return
 
     def forward(self, x):
         y = self.block(x)
