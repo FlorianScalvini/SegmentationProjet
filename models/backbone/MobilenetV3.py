@@ -1,12 +1,11 @@
 import torch.nn as nn
-from models.module.convBnRelu import ConvBNActivation, ConvBN
-from models.module.SqueezeExcitation import SqueezeExcitation
+from models.module import ConvBNActivation, SqueezeExcitation, ConvBN
 from models.backbone.Backbone import *
 
 class MobilenetV3(Backbone):
     def __init__(self, version=None, num_classes=1000):
         super(MobilenetV3, self).__init__(num_classes=num_classes)
-        self.classifier = None
+        self.Classifier = None
         if version == "small":
             self._smallNetwork()
         elif version == "large":
@@ -23,7 +22,7 @@ class MobilenetV3(Backbone):
         if self._backbone:
             return feature_4, feature_8, feature_16, feature_32
         else:
-            return self.classifier(feature_32)
+            return self.Classifier(feature_32)
 
     def _largeNetwork(self):
         self.stage1 = nn.Sequential(
@@ -53,7 +52,7 @@ class MobilenetV3(Backbone):
             InvertedResidual(in_channels=160, out_channels=160, exp_channels=960, kernel_size=5, strideDW=1, se=True, activation="HS"),
             InvertedResidual(in_channels=160, out_channels=160, exp_channels=960, kernel_size=5, strideDW=1, se=True, activation="HS"),
         )
-        self.classifier = nn.Sequential(
+        self.Classifier = nn.Sequential(
             ConvBNActivation(in_channels=160, out_channels=960, stride=1, kernel_size=1, bias=False, activation=nn.Hardswish()),
             nn.AdaptiveAvgPool2d(output_size=1),
             nn.Linear(in_features=576, out_features=1280, bias=True),
@@ -86,9 +85,10 @@ class MobilenetV3(Backbone):
             InvertedResidual(in_channels=96, out_channels=96, exp_channels=576, kernel_size=5, strideDW=1, se=True, activation="HS"),
         )
 
-        self.classifier = nn.Sequential(
+        self.Classifier = nn.Sequential(
             ConvBNActivation(in_channels=96, out_channels=576, stride=1, kernel_size=1, bias=False, activation=nn.Hardswish()),
             nn.AdaptiveAvgPool2d(output_size=1),
+            nn.Flatten(1),
             nn.Linear(in_features=576, out_features=1024, bias=True),
             nn.Hardswish(),
             nn.Dropout(p=0.2, inplace=True),
@@ -106,14 +106,13 @@ class InvertedResidual(nn.Module):
             raise ValueError(self.__name__ + "implemnted only RE : Relu or HS : Hardswish activation.")
         if strideDW > 2:
             raise ValueError(self.__name__ + "is not implemented with stride upper than 2.")
-        self.strideDW = strideDW
-
+        self.identity = strideDW == 1 and in_channels == out_channels
         layers = []
         if exp_channels != in_channels:
             layers.append(ConvBNActivation(in_channels=in_channels, out_channels=exp_channels, activation=act, kernel_size=1, stride=1, bias=False))
         layers.append(
             ConvBNActivation(in_channels=exp_channels, out_channels=exp_channels, activation=act,
-                             kernel_size=kernel_size, groups=exp_channels, padding=int(kernel_size / 2), stride=self.strideDW, bias=False))
+                             kernel_size=kernel_size, groups=exp_channels, padding=int(kernel_size / 2), stride=strideDW, bias=False))
         if se:
 
             layers.append(SqueezeExcitation(in_channels=exp_channels, squeeze_channels=int(exp_channels * 0.25), scale_activation=nn.Hardswish()))
@@ -126,7 +125,7 @@ class InvertedResidual(nn.Module):
 
     def forward(self, x):
         y = self.block(x)
-        if self.strideDW == 2:
+        if self.identity == 2:
             y = y + x
         return y
 
@@ -137,12 +136,8 @@ class InvertedResidual(nn.Module):
                 if not ly.bias is None: nn.init.constant_(ly.bias, 0)
 
 
-
-
-
 if __name__ == "__main__":
     import torchsummary
     mdl = MobilenetV3(version="small").cuda()
     mdl.classifier()
     torchsummary.summary(mdl, (3, 224, 224))
-    print(mdl)

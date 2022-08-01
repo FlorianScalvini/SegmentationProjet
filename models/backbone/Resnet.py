@@ -1,8 +1,6 @@
 import torch
-import torchvision
 import torch.nn as nn
-from models.module.convBnRelu import ConvBNRelu, ConvBN
-from utils.helpers import load_from_url
+from models.module import ConvBNRelu, ConvBN
 from Backbone import Backbone
 
 class Resnet(Backbone):
@@ -26,11 +24,13 @@ class Resnet(Backbone):
         self.layer3 = self._make_layer(block=block, planes=256, blocks=layers[2], stride=2)
         self.layer4 = self._make_layer(block=block, planes=512, blocks=layers[3], stride=2)
 
-        self.classifier = nn.Sequential(
+        self.Classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
-            nn.Linear(512 * block.expansion, num_classes)
+            nn.Flatten(1),
+
         )
 
+        self.a =  nn.Linear(512 * block.expansion, num_classes)
         if pretrained is not False:
             # Mapping Pytorch Resnet with this Resnet implementation
             state_dict = torch.load(pretrained)
@@ -89,9 +89,7 @@ class Resnet(Backbone):
         if self.backbone:
             return x1, x2, x3, x4
         else:
-            y = self.avgpool(x4)
-            y = torch.flatten(y, 1)
-            y = self.fc(y)
+            y = self.Classifier(x4)
             return y
 
 
@@ -174,7 +172,8 @@ def Resnet152(pretrained=False):
 
 
 if __name__ == "__main__":
-    c = Resnet18(pretrained=True)
+    import torchsummary
+    mdl = Resnet18(pretrained=False).cuda()
     a  = torch.rand((1,3,224,224))
-    b = c(a)
-    print(b[0][0])
+    mdl.classifier()
+    torchsummary.summary(mdl, (3, 224, 224))

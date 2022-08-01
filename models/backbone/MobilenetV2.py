@@ -1,5 +1,5 @@
 import torch.nn as nn
-from models.module.convBnRelu import ConvBNActivation, ConvBN
+from models.module import ConvBNActivation, ConvBN
 from Backbone import Backbone
 
 def _make_divisible(v, divisor):
@@ -71,11 +71,15 @@ class MobilenetV2(Backbone):
 
         in_chls = chls
         chls = self._makeChl(1280)
-        self.classifier = nn.Sequential(
+
+        self.Classifier = nn.Sequential(
             ConvBNActivation(in_channels=in_chls, out_channels=chls, stride=1, kernel_size=1, bias=False, activation=nn.ReLU6(inplace=True)),
+            nn.AdaptiveAvgPool2d((1, 1)),
+            nn.Flatten(1),
             nn.Dropout(p=0.2, inplace=False),
-            nn.Linear(in_features=chls, out_features=num_classes)
+            nn.Linear(in_features=chls, out_features=num_classes, bias=True)
         )
+
 
     def _makeChl(self, channels):
         min_channel = min(channels, self.min_channel)
@@ -94,7 +98,7 @@ class MobilenetV2(Backbone):
         if self._backbone:
             return feature_4, feature_8, feature_16, feature_32
         else:
-            return self.classifier(feature_32)
+            return self.Classifier(feature_32)
 
 
 class InvertedResidual(nn.Module):
@@ -132,4 +136,3 @@ if __name__ == "__main__":
     mdl = MobilenetV2().cuda()
     mdl.classifier()
     torchsummary.summary(mdl, (3, 224, 224))
-    print(mdl)

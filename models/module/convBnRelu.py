@@ -3,7 +3,7 @@ import torch
 
 
 class ConvBNActivation(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, bias=True,
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, bias=False,
                  activation=None, groups=1, dilation=1):
         super(ConvBNActivation, self).__init__()
         self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels,kernel_size=kernel_size, stride=stride, padding=padding, bias=bias, groups=groups, dilation=dilation)
@@ -25,14 +25,14 @@ class ConvBNActivation(nn.Module):
                 if not ly.bias is None: nn.init.constant_(ly.bias, 0)
 
 class ConvBN(ConvBNActivation):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, groups=1, dilation=1, bias=True):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, groups=1, dilation=1, bias=False):
         super(ConvBN, self).__init__(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
                                      stride=stride, padding=padding, bias=bias, activation=None,
                                      groups=groups, dilation=dilation)
 
 
 class ConvBNRelu(ConvBNActivation):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, groups=1, bias=True, dilation=1):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, groups=1, bias=False, dilation=1):
         super(ConvBNRelu, self).__init__(in_channels=in_channels, out_channels=out_channels,
                                          kernel_size=kernel_size, stride=stride, padding=padding,
                                          bias=bias, activation=nn.ReLU(), groups=groups, dilation=dilation)

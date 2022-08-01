@@ -5,9 +5,9 @@ class SqueezeExcitation(nn.Module):
         super(SqueezeExcitation, self).__init__()
         self.scale = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
-            nn.Conv2d(in_channels=in_channels, out_channels=squeeze_channels, kernel_size=1, stride=1),
+            nn.Conv2d(in_channels=in_channels, out_channels=squeeze_channels, kernel_size=1, stride=1, bias=False),
             activation,
-            nn.Conv2d(in_channels=squeeze_channels, out_channels=in_channels, kernel_size=1, stride=1),
+            nn.Conv2d(in_channels=squeeze_channels, out_channels=in_channels, kernel_size=1, stride=1, bias=False),
             scale_activation
         )
 
