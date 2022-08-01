@@ -11,7 +11,6 @@ def _make_divisible(v, divisor):
 
 
 class MobilenetV2(Backbone):
-
     def __init__(self, width_mult=1.0, min_channel=16, num_classes=1000):
         super(MobilenetV2, self).__init__()
         self.min_channel = min_channel
@@ -128,6 +127,9 @@ class InvertedResidual(nn.Module):
 
 
 if __name__ == "__main__":
+    import torchsummary
     import torchvision.models
-    mdl = MobilenetV2()
+    mdl = MobilenetV2().cuda()
+    mdl.classifier()
+    torchsummary.summary(mdl, (3, 224, 224))
     print(mdl)

@@ -9,7 +9,7 @@ class ConvBNActivation(nn.Module):
         self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels,kernel_size=kernel_size, stride=stride, padding=padding, bias=bias, groups=groups, dilation=dilation)
         self.bn = nn.BatchNorm2d(num_features=out_channels)
         self.act = activation
-        return
+        self.init_weight()
 
     def forward(self, x):
         y = self.conv(x)

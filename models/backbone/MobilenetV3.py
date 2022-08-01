@@ -1,10 +1,11 @@
 import torch.nn as nn
 from models.module.convBnRelu import ConvBNActivation, ConvBN
+from models.module.SqueezeExcitation import SqueezeExcitation
+from models.backbone.Backbone import *
 
-
-
-class MobilenetV3(nn.Module):
+class MobilenetV3(Backbone):
     def __init__(self, version=None, num_classes=1000):
+        super(MobilenetV3, self).__init__(num_classes=num_classes)
         self.classifier = None
         if version == "small":
             self._smallNetwork()
@@ -12,10 +13,10 @@ class MobilenetV3(nn.Module):
             self._largeNetwork()
         else:
             raise ValueError(self.__name__ + "is implemented with in large or small version")
+        self._init_weight()
 
     def forward(self, x):
-        feature_2 = self.stage0(x)
-        feature_4 = self.stage1(feature_2)
+        feature_4 = self.stage1(x)
         feature_8 = self.stage2(feature_4)
         feature_16 = self.stage3(feature_8)
         feature_32 = self.stage4(feature_16)
@@ -114,7 +115,8 @@ class InvertedResidual(nn.Module):
             ConvBNActivation(in_channels=exp_channels, out_channels=exp_channels, activation=act,
                              kernel_size=kernel_size, groups=exp_channels, padding=int(kernel_size / 2), stride=self.strideDW, bias=False))
         if se:
-            layers.append(SqueezeExcitation(in_channels=exp_channels, expansion=0.25))
+
+            layers.append(SqueezeExcitation(in_channels=exp_channels, squeeze_channels=int(exp_channels * 0.25), scale_activation=nn.Hardswish()))
 
         layers.append(
             ConvBNActivation(in_channels=exp_channels, out_channels=out_channels, activation=nn.Identity(),
@@ -135,27 +137,12 @@ class InvertedResidual(nn.Module):
                 if not ly.bias is None: nn.init.constant_(ly.bias, 0)
 
 
-class SqueezeExcitation(nn.Module):
-    def __init__(self, in_channels, expansion):
-        super(SqueezeExcitation, self).__init__()
-        mid_channels = int(in_channels*expansion)
-        self.fc1 = nn.Conv2d(in_channels=in_channels, out_channels=mid_channels, kernel_size=1, stride=1)
-        self.relu = nn.ReLU(inplace=True)
-        self.fc2 = nn.Conv2d(in_channels=mid_channels, out_channels=in_channels, kernel_size=1, stride=1)
 
-    def forward(self,x):
-        y = self.fc1(x)
-        y = self.relu(y)
-        y = self.fc2(y)
-        return y
-
-    def init_weight(self):
-        for ly in self.children():
-            if isinstance(ly, nn.Conv2d):
-                nn.init.kaiming_normal_(ly.weight, a=1)
-                if not ly.bias is None: nn.init.constant_(ly.bias, 0)
 
 
 if __name__ == "__main__":
-    mdl = MobilenetV3(version="small")
+    import torchsummary
+    mdl = MobilenetV3(version="small").cuda()
+    mdl.classifier()
+    torchsummary.summary(mdl, (3, 224, 224))
     print(mdl)
