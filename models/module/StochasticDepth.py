@@ -52,9 +52,8 @@ class StochasticDepth(nn.Module):
 
 
     def forward(self, x):
-        return stochastic_depth(x, self.p, self.mode, self.training)
-
+        return stochastic_depth(x, self.prob, self.mode, self.training)
 
     def __repr__(self) -> str:
-        s = f"{self.__class__.__name__}(p={self.p}, mode={self.mode})"
+        s = f"{self.__class__.__name__}(p={self.prob}, mode={self.mode})"
         return s

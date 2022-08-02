@@ -1,18 +1,23 @@
 import torch.nn as nn
+from functools import partial
+
 
 class SqueezeExcitation(nn.Module):
-    def __init__(self, in_channels, squeeze_channels, activation=nn.ReLU(inplace=True), scale_activation=nn.Sigmoid()):
+    def __init__(self, in_channels, squeeze_channels, activation=partial(nn.ReLU, True), scale_activation=nn.Sigmoid):
         super(SqueezeExcitation, self).__init__()
-        self.scale = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Conv2d(in_channels=in_channels, out_channels=squeeze_channels, kernel_size=1, stride=1, bias=False),
-            activation,
-            nn.Conv2d(in_channels=squeeze_channels, out_channels=in_channels, kernel_size=1, stride=1, bias=False),
-            scale_activation
-        )
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.fc1 = nn.Conv2d(in_channels=in_channels, out_channels=squeeze_channels, kernel_size=1, stride=1, bias=True)
+        self.act = activation()
+        self.fc2 = nn.Conv2d(in_channels=squeeze_channels, out_channels=in_channels, kernel_size=1, stride=1, bias=True)
+        self.scale_act = scale_activation()
+
 
     def forward(self,x):
-        y = self.scale(x)
+        y = self.avgpool(x)
+        y = self.fc1(y)
+        y = self.act(y)
+        y = self.fc2(y)
+        y = self.scale_act(y)
         return y * x
 
     def init_weight(self):

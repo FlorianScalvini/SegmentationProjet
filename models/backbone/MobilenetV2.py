@@ -1,7 +1,7 @@
 import torch.nn as nn
 from models.module import ConvBNActivation, ConvBN
-from Backbone import Backbone
-
+from models.backbone.Backbone import Backbone
+from functools import partial
 def _make_divisible(v, divisor):
     new_v = max(divisor, int(v + divisor / 2) // divisor * divisor)
     # Make sure that round down does not go down by more than 10%.
@@ -15,10 +15,10 @@ class MobilenetV2(Backbone):
         super(MobilenetV2, self).__init__()
         self.min_channel = min_channel
         self.width_mult = width_mult
-
+        act_layer = partial(nn.ReLU6, True)
         chls = self._makeChl(32)
         self.stage0 = ConvBNActivation(in_channels=3, out_channels=chls, stride=2,
-                                       kernel_size=3, padding=1, bias=False, activation=nn.ReLU6(inplace=True))
+                                       kernel_size=3, padding=1, bias=False, activation=act_layer)
         in_chls = chls
         chls = self._makeChl(16)
         self.stage1 = InvertedResidual(in_channels=in_chls, out_channels=chls,
@@ -73,7 +73,7 @@ class MobilenetV2(Backbone):
         chls = self._makeChl(1280)
 
         self.Classifier = nn.Sequential(
-            ConvBNActivation(in_channels=in_chls, out_channels=chls, stride=1, kernel_size=1, bias=False, activation=nn.ReLU6(inplace=True)),
+            ConvBNActivation(in_channels=in_chls, out_channels=chls, stride=1, kernel_size=1, bias=False, activation=act_layer),
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(1),
             nn.Dropout(p=0.2, inplace=False),
@@ -104,13 +104,15 @@ class MobilenetV2(Backbone):
 class InvertedResidual(nn.Module):
     def __init__(self, in_channels, out_channels, strideDW=1, expansion=1):
         super(InvertedResidual, self).__init__()
+
         if strideDW > 2 :
             raise ValueError(self.__name__ + "is not implemented with stride upper than 2.")
         self.strideDW = strideDW
         self.identity = strideDW == 1 and in_channels == out_channels
         layers = []
+        act_layer = partial(nn.ReLU6, True)
         if expansion != 1:
-            layers.append(ConvBNActivation(in_channels=in_channels, out_channels=in_channels*expansion, activation=nn.ReLU6(inplace=True), kernel_size=1, stride=1, bias=False))
+            layers.append(ConvBNActivation(in_channels=in_channels, out_channels=in_channels*expansion, activation=act_layer, kernel_size=1, stride=1, bias=False))
         layers.append(ConvBNActivation(in_channels=in_channels*expansion, out_channels=in_channels*expansion,
                                        groups=in_channels*expansion, activation=nn.ReLU6(inplace=True), kernel_size=3,
                                        stride=self.strideDW, padding=1, bias=False))

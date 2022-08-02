@@ -1,6 +1,7 @@
 import torch.nn as nn
 from models.module import ConvBNActivation, SqueezeExcitation, ConvBN
 from models.backbone.Backbone import *
+from functools import partial
 
 class MobilenetV3(Backbone):
     def __init__(self, version=None, num_classes=1000):
@@ -26,7 +27,7 @@ class MobilenetV3(Backbone):
 
     def _largeNetwork(self):
         self.stage1 = nn.Sequential(
-            ConvBNActivation(in_channels=3, out_channels=16, stride=2, kernel_size=3, padding=1, bias=False,activation=nn.Hardswish()),
+            ConvBNActivation(in_channels=3, out_channels=16, stride=2, kernel_size=3, padding=1, bias=False,activation=nn.Hardswish),
             InvertedResidual(in_channels=16, out_channels=16, exp_channels=16, kernel_size=3, strideDW=1, se=False,activation="RE"),
             InvertedResidual(in_channels=16, out_channels=24, exp_channels=64, kernel_size=3, strideDW=2, se=False,activation="RE"),
             InvertedResidual(in_channels=24, out_channels=24, exp_channels=72, kernel_size=3, strideDW=1, se=False,activation="RE"),
@@ -53,7 +54,7 @@ class MobilenetV3(Backbone):
             InvertedResidual(in_channels=160, out_channels=160, exp_channels=960, kernel_size=5, strideDW=1, se=True, activation="HS"),
         )
         self.Classifier = nn.Sequential(
-            ConvBNActivation(in_channels=160, out_channels=960, stride=1, kernel_size=1, bias=False, activation=nn.Hardswish()),
+            ConvBNActivation(in_channels=160, out_channels=960, stride=1, kernel_size=1, bias=False, activation=nn.Hardswish),
             nn.AdaptiveAvgPool2d(output_size=1),
             nn.Linear(in_features=576, out_features=1280, bias=True),
             nn.Hardswish(),
@@ -62,7 +63,7 @@ class MobilenetV3(Backbone):
 
     def _smallNetwork(self):
         self.stage1 = nn.Sequential(
-            ConvBNActivation(in_channels=3, out_channels=16, stride=2, kernel_size=3, padding=1, bias=False, activation=nn.Hardswish()),
+            ConvBNActivation(in_channels=3, out_channels=16, stride=2, kernel_size=3, padding=1, bias=False, activation=nn.Hardswish),
             InvertedResidual(in_channels=16, out_channels=16, exp_channels=16, kernel_size=3, strideDW=2, se=True, activation="RE")
         )
 
@@ -86,7 +87,7 @@ class MobilenetV3(Backbone):
         )
 
         self.Classifier = nn.Sequential(
-            ConvBNActivation(in_channels=96, out_channels=576, stride=1, kernel_size=1, bias=False, activation=nn.Hardswish()),
+            ConvBNActivation(in_channels=96, out_channels=576, stride=1, kernel_size=1, bias=False, activation=nn.Hardswish),
             nn.AdaptiveAvgPool2d(output_size=1),
             nn.Flatten(1),
             nn.Linear(in_features=576, out_features=1024, bias=True),
@@ -99,9 +100,9 @@ class InvertedResidual(nn.Module):
     def __init__(self, in_channels, out_channels, exp_channels=1, kernel_size=3, strideDW=1,se=False, activation="HS"):
         super(InvertedResidual, self).__init__()
         if activation == "HS":
-            act = nn.Hardswish()
+            act = nn.Hardswish
         elif activation == "RE":
-            act = nn.ReLU(inplace=True)
+            act = partial(nn.ReLU,True)
         else:
             raise ValueError(self.__name__ + "implemnted only RE : Relu or HS : Hardswish activation.")
         if strideDW > 2:
@@ -118,7 +119,7 @@ class InvertedResidual(nn.Module):
             layers.append(SqueezeExcitation(in_channels=exp_channels, squeeze_channels=int(exp_channels * 0.25), scale_activation=nn.Hardswish()))
 
         layers.append(
-            ConvBNActivation(in_channels=exp_channels, out_channels=out_channels, activation=nn.Identity(),
+            ConvBNActivation(in_channels=exp_channels, out_channels=out_channels, activation=nn.Identity,
                              kernel_size=1, stride=1, bias=False))
         self.block = nn.Sequential(*layers)
         return

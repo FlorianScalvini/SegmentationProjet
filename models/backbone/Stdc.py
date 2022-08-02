@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import math
 from models.module import *
-from Backbone import Backbone
+from models.backbone.Backbone import Backbone
 
 
 class STDC(Backbone):

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from models.module import ConvBNRelu, ConvBN
-from Backbone import Backbone
+from models.backbone.Backbone import Backbone
 
 class Resnet(Backbone):
     def __init__(self, block, layers=None, pretrained=False, num_classes=1000, groups=1, width_per_group=64,
