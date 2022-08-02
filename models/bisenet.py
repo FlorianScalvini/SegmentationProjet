@@ -10,9 +10,10 @@ class Bisenet(BaseModel):
 class ContextPath(nn.Module):
     def __init__(self, backbone):
         super(ContextPath, self).__init__()
-        if backbone == "resnet18":
+        if backbone in ["resnet18", "resnet101", "xception"]:
             self.backbone = backbone
-        self.b
+        else:
+            raise ValueError("Not implemented backbone")
 
 class SpatialPath(nn.Module):
     def __init__(self):

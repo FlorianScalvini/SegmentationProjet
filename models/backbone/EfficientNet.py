@@ -2,77 +2,46 @@ from Backbone import Backbone
 from models.module import ConvBNActivation, SqueezeExcitation, ConvBN, StochasticDepth
 import torch.nn as nn
 import torch
+import math
 
 
-models_list = [
-    "efficientnet_b0",
-    "efficientnet_b1",
-    "efficientnet_b2",
-    "efficientnet_b3",
-    "efficientnet_b4",
-    "efficientnet_b5",
-    "efficientnet_b6",
-    "efficientnet_b7",
-    "efficientnet_v2_s",
-    "efficientnet_v2_m",
-    "efficientnet_v2_l",
-]
 
-inverted_residual_setting = [
-    bneck_conf(1, 3, 1, 32, 16, 1),
-    bneck_conf(6, 3, 2, 16, 24, 2),
-    bneck_conf(6, 5, 2, 24, 40, 2),
-    bneck_conf(6, 3, 2, 40, 80, 3),
-    bneck_conf(6, 5, 1, 80, 112, 3),
-    bneck_conf(6, 5, 2, 112, 192, 4),
-    bneck_conf(6, 3, 1, 192, 320, 1),
-]
+def makeChl(channels, expand_ratio, min_channels=None):
+    if min_channels is None:
+        min_channels = channels
+    else:
+        min_channels = min(channels, min_channels)
+    return max(min_channels, int(channels * expand_ratio))
 
-inverted_residual_setting =
-[
-    [32, 16, 1, 3, 1, 1],
-    [16, 24, 2, 3, 6, 2],
-    [24, 40, 2, 5, 6, 2],
-    [40, 80, 2, 3, 6, 3],
-    [80, 112, 1, 5, 6, 3],
-    [112, 192, 2, 5, 6, 4],
-    [192, 320, 1, 5, 6, 2]
-]
 
 def EfficientNetB0():
-
-
-def EfficientNetB(width=1.0, depth=1.0):
-    inverted_residual_setting = [
-        ConvBNActivation()
-    ]
-    inverted_residual_setting = [
-
-        [1, 3, 1, 32, 16, 1],
-        [6, 3, 2, 16, 24, 2]
-    ]
-
-def _confEfficientNetB(type="l"):
-    return
-
-def _confEfficientNet2(type="m"):
-    if type not in ["s", "l", "m"]:
-        raise ValueError("Not implemented network EfficientNet2" + str(type))
-
+    EfficientNet()
 
 
 
 
 
 class EfficientNet(Backbone):
-    def __init__(self, type="EfficientNetB0"):
+    def __init__(self, type="b0"):
         super(EfficientNet, self).__init__()
-        if type not in models_list:
+        type = type.lower()
+        if type not in ["b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "v2_s", "v2_m", "v2_l"]:
             raise ValueError("Not implemented model")
-        if type.startswith("EfficientNetB"):
-            _confEfficientNetB(type[-1])
-
-
+        if type[0] == "b":
+            config = self._confEfficientNetB(type)
+        else:
+            config = self._confEfficientNetV2(type)
+        layers = []
+        for t, ci, co, s, k, exp, k  in config:
+            if t == "FusedMBConv":
+                for i in range(k):
+                    layers.append(FusedMBConv(in_channels=ci, out_channels=co, stride=s, kernel_size=k, expand_ratio=exp))
+                    ci = co
+            elif t == "MBConvBlock":
+                for i in range(k):
+                    layers.append(MBConvBlock(in_channels=ci, out_channels=co, stride=s, expand_ratio=exp))
+            else:
+                raise ValueError('Unimplemented residual block')
 
 
 
@@ -85,14 +54,92 @@ class EfficientNet(Backbone):
         )
         self._init_weight()
 
+    @staticmethod
+    def _confEfficientNetB(type="0"):
+        width = 1.0
+        depth = 1.0
+        if type=="1":
+            depth = 1.1
+        elif type == "2":
+            width = 1.1
+            depth = 1.2
+        elif type == "2":
+            width = 1.2
+            depth = 1.4
+        elif type == "2":
+            width = 1.0
+            depth = 1.0
+        elif type == "2":
+            width = 1.0
+            depth = 1.0
+        elif type == "2":
+            width = 1.0
+            depth = 1.0
+    @staticmethod
+    def _configEfficientNetB(width=1.0, depth=1.0):
+        config_width_depth = {
+            "b0": [1.0, 1.0],
+            "b1": [1.0, 1.1],
+            "b2": [1.1, 1.2],
+            "b3": [1.2, 1.4],
+            "b4": [1.4, 1.8],
+            "b5": [1.6, 2.2],
+            "b6": [1.8, 2.6],
+            "b7": [2.0, 3.1],
+        }
+        config_inv_residual = [
+            [32, 16, 1, 3, 1, 1],
+            [16, 24, 2, 3, 6, 2],
+            [24, 40, 2, 5, 6, 2],
+            [40, 80, 2, 3, 6, 3],
+            [80, 112, 1, 5, 6, 3],
+            [112, 192, 2, 5, 6, 4],
+            [192, 320, 1, 5, 6, 2]
+        ]
+        width, depth = config_width_depth["b0"]
+        for idx in range(len(config_inv_residual)):
+            config_inv_residual[idx][0] = makeChl(config_inv_residual[idx][0], width)
+            config_inv_residual[idx][0] = makeChl(config_inv_residual[idx][0], width)
+            config_inv_residual[idx][-1] = int(math.ceil(config_inv_residual[idx][-1] * depth))
+        return config_inv_residual
 
+    @staticmethod
+    def _confEfficientNetV2(type="v2_m"):
+        config_inv_residual = None
+        if type == "v2_s":
+            config_inv_residual = [
+                ["FusedMBConv", 24, 24, 1, 3, 1, 2],
+                ["FusedMBConv", 24, 48, 2, 3, 4, 4],
+                ["FusedMBConv", 48, 64, 2, 3, 4, 4],
+                ["MBConvBlock", 64, 128, 2, 3, 4, 6],
+                ["MBConvBlock", 128, 160, 1, 3, 6, 9],
+                ["MBConvBlock", 160, 256, 2, 3, 6, 15],
+            ]
+        elif type == "v2_m":
+            config_inv_residual = [
+                ["FusedMBConv", 24, 24, 1, 3, 1, 3],
+                ["FusedMBConv", 24, 48, 2, 3, 4, 5],
+                ["FusedMBConv", 48, 80, 2, 3, 4, 5],
+                ["MBConvBlock", 80, 160, 2, 3, 4, 7],
+                ["MBConvBlock", 160, 176, 1, 3, 6, 14],
+                ["MBConvBlock", 176, 304, 2, 3, 6, 28],
+                ["MBConvBlock", 304, 512, 1, 3, 6, 5],
+            ]
 
-def makeChl(channels, expand_ratio, min_channels=None):
-    if min_channels is None:
-        min_channels = channels
-    else:
-        min_channels = min(channels, min_channels)
-    return max(min_channels, int(channels * expand_ratio))
+        elif type == "v2_l":
+            config_inv_residual = [
+                ["FusedMBConv", 32, 32, 1, 3, 1, 4],
+                ["FusedMBConv", 32, 64, 2, 3, 4, 7],
+                ["FusedMBConv", 64, 96, 2, 3, 4, 7],
+                ["MBConvBlock", 96, 192, 2, 3, 4, 10],
+                ["MBConvBlock", 192, 224, 1, 3, 6, 19],
+                ["MBConvBlock", 224, 384, 2, 3, 6, 25],
+                ["MBConvBlock", 384, 640, 1, 3, 6, 7],
+            ]
+        else:
+            raise ValueError("Not implemented network EfficientNet2" + str(type))
+        return config_inv_residual
+
 
 
 class FusedMBConv(nn.Module):
