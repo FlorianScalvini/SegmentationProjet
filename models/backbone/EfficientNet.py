@@ -1,6 +1,7 @@
 from models.backbone.Backbone import Backbone
 from models.module import ConvBNActivation, SqueezeExcitation, ConvBN, StochasticDepth
 import torch.nn as nn
+from utils.utils import make_divisible
 import torch
 from functools import partial
 import math
@@ -52,14 +53,14 @@ class EfficientNet(Backbone):
             layers.append(nn.Sequential(*block))
 
         self.layers = nn.Sequential(*layers)
-
+        channels_classifier = 1280 if type[0] != 'b' else 4 * in_channels
 
         self.Classifier = nn.Sequential(
-            ConvBNActivation(in_channels, 1280, kernel_size=1, activation=partial(nn.SiLU, True), bias=False),
+            ConvBNActivation(in_channels, channels_classifier, kernel_size=1, activation=partial(nn.SiLU, True), bias=False),
             nn.AdaptiveAvgPool2d(output_size=1),
             nn.Flatten(1),
             nn.Dropout(p=0.2, inplace=True),
-            nn.Linear(in_features=1280, out_features=self.num_classes, bias=True)
+            nn.Linear(in_features=channels_classifier, out_features=self.num_classes, bias=True)
         )
 
         self._init_weight()
@@ -86,16 +87,11 @@ class EfficientNet(Backbone):
         config_inv_residual = [
             ["MBConvBlock", 32, 16, 1, 3, 1, 1],
             ["MBConvBlock", 16, 24, 2, 3, 6, 2],
-            ["MBConvBlock", 24, 40, 2, 5, 6, 2],
-            ["MBConvBlock", 40, 80, 2, 3, 6, 3],
-            ["MBConvBlock", 80, 112, 1, 5, 6, 3],
-            ["MBConvBlock", 112, 192, 2, 5, 6, 4],
-            ["MBConvBlock", 192, 320, 1, 3, 6, 1]
         ]
         width, depth = config_width_depth[type]
         for idx in range(len(config_inv_residual)):
-            config_inv_residual[idx][1] = makeChl(config_inv_residual[idx][1], width)
-            config_inv_residual[idx][2] = makeChl(config_inv_residual[idx][2], width)
+            config_inv_residual[idx][1] = make_divisible(config_inv_residual[idx][1] * width, 8)
+            config_inv_residual[idx][2] = make_divisible(config_inv_residual[idx][2] * width, 8)
             config_inv_residual[idx][6] = int(math.ceil(config_inv_residual[idx][6] * depth))
         return config_inv_residual
 
@@ -219,6 +215,6 @@ class MBConvBlock(nn.Module):
 if __name__ == "__main__":
     import torchsummary
     import torchvision.models
-    mdl = EfficientNet(type="b1").cuda()
+    mdl = EfficientNet(type="b7").cuda()
     mdl.classifier()
     torchsummary.summary(mdl, (3, 224, 224))
