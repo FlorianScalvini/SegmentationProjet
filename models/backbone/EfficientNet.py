@@ -18,7 +18,7 @@ def makeChl(channels, expand_ratio, min_channels=None):
 
 
 class EfficientNet(Backbone):
-    def __init__(self, type="b0", stoch_depth_prob=0.2):
+    def __init__(self, type="b0", stoch_depth_prob=0.2, logits_out=None):
         super(EfficientNet, self).__init__()
         type = type.lower()
         if type not in ["b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "v2_s", "v2_m", "v2_l"]:
@@ -27,15 +27,21 @@ class EfficientNet(Backbone):
             config = self._confEfficientNetB(type)
         else:
             config = self._confEfficientNetV2(type)
-        layers = []
+
+        if logits_out is None:
+            self.logits_out = len(config)
+        else:
+             self.logits_out = logits_out
+
+        self.layers = []
         total_block_len = 0
         stage_block_id = 0
         for _, _, _, _, _, _, k  in config:
             total_block_len += k
         in_channels = None
         for t, ci, co, s, k, exp, n  in config:
-            if not layers:
-                layers.append(ConvBNActivation(3, ci, kernel_size=3, stride=2, activation=partial(nn.SiLU, True), padding=1))
+            if not self.layers:
+                self.layers.append(ConvBNActivation(3, ci, kernel_size=3, stride=2, activation=partial(nn.SiLU, True), padding=1))
                 in_channels = ci
             block = []
             for _ in range(n):
@@ -50,9 +56,8 @@ class EfficientNet(Backbone):
                     raise ValueError('Unimplemented residual block')
                 in_channels = co
                 stage_block_id += 1
-            layers.append(nn.Sequential(*block))
+            self.layers.append(nn.Sequential(*block))
 
-        self.layers = nn.Sequential(*layers)
         channels_classifier = 1280 if type[0] != 'b' else 4 * in_channels
 
         self.Classifier = nn.Sequential(
@@ -66,9 +71,14 @@ class EfficientNet(Backbone):
         self._init_weight()
 
     def forward(self, x):
-        y = self.layers(x)
+        logit_out = []
+        y = self.layers[0](x)
+        for idx, layer in self.layers[1:]:
+            y = layer(y)
+            if idx in self.logits_out and self._backbone:
+                logit_out.append(y)
         if self._backbone:
-            return y
+            return logit_out
         else:
             return self.Classifier(y)
 

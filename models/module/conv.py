@@ -42,3 +42,16 @@ class ConvBNRelu(ConvBNActivation):
                                          kernel_size=kernel_size, stride=stride, padding=padding,
                                          bias=bias, activation=partial(nn.ReLU, True), groups=groups, dilation=dilation)
 
+
+class ConvAct(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=0, bias=False,
+                 activation=partial(nn.ReLU, True), groups=1, dilation=1):
+        super(ConvAct, self).__init__()
+        self.conv = nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size,
+                              stride=stride, padding=padding, bias=bias, groups=groups, dilation=dilation)
+        self.act = activation()
+
+    def forward(self, x):
+        y = self.conv(x)
+        y = self.act(y)
+        return  y

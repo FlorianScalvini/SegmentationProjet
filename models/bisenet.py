@@ -1,7 +1,6 @@
 import torch.nn.functional
 from BaseModel import BaseModel
 from models.module import *
-from models.module
 
 class Bisenet(BaseModel):
     def __init__(self, num_classes, pretrained=None, lambd=0.25, align_corners=True, *args, **kwargs):

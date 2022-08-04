@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from models.module.convBnRelu import ConvBN, ConvBNRelu
+from models.module.conv import ConvBN, ConvBNRelu
 
 
 class Xception(nn.Module):

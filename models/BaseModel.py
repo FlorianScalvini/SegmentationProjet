@@ -14,8 +14,7 @@ class BaseModel(nn.Module):
         self.pretrained = pretrained
         if backbone is not None:
             self.backbone = backbone
-        else:
-            self.backbone = None
+
 
     def forward(self, x):
         raise NotImplementedError
@@ -23,3 +22,11 @@ class BaseModel(nn.Module):
     def __str__(self):
         nbr_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         return super(BaseModel, self).__str__() + f'\nNbr of trainable parameters: {nbr_params}'
+
+    def freeze_bn(self):
+        for module in self.modules():
+            if isinstance(module, nn.BatchNorm2d): module.eval()
+
+    def unfreeze_bn(self):
+        for module in self.modules():
+            if isinstance(module, nn.BatchNorm2d): module.train()

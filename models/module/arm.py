@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from models.module.convBnRelu import ConvBNRelu, ConvBN
+from models.module.conv import ConvBNRelu, ConvBN
 
 """
     Bisenetv1 Module : https://arxiv.org/pdf/1808.00897.pdf

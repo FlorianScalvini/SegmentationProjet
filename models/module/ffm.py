@@ -6,7 +6,7 @@
 
 import torch
 import torch.nn as nn
-from models.module.convBnRelu import ConvBNRelu
+from models.module.conv import ConvBNRelu
 
 class FeatureFusionModule(nn.Module):
     def __init__(self, in_chan, out_chan):

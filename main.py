@@ -3,7 +3,8 @@ from train import Trainer
 import models
 
 
-
+def test():
+    print("ffffff")
 
 if __name__ == "__main__":
     config = config.ConfigParser("C:\\Users\\Florian\\PycharmProjects\\SegmentationProjet\\config.json")
