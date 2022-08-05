@@ -6,6 +6,8 @@ class Bisenet(BaseModel):
     def __init__(self, num_classes, pretrained=None, lambd=0.25, align_corners=True, *args, **kwargs):
         super(Bisenet, self).__init__(num_classes=num_classes, pretrained=pretrained, backbone=None)
 
+
+
 class ContextPath(nn.Module):
     def __init__(self, backbone):
         super(ContextPath, self).__init__()
@@ -13,6 +15,16 @@ class ContextPath(nn.Module):
             self.backbone = backbone
         else:
             raise ValueError("Not implemented backbone")
+        self.arm16 = AttentionRefinementModule()
+        self.arm32 = AttentionRefinementModule()
+
+    def forward(self, x):
+        features = self.backbone(x)
+        y16 = self.arm16(features[-2])
+        y32 = self.arm32(features[-1])
+        last_fm = F.interpolate(y32, size=y16.shape()[2:], mode='bilinear', align_corners=True)
+
+        return y16 + y32
 
 class SpatialPath(nn.Module):
     def __init__(self):

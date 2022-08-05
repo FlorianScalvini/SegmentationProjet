@@ -18,7 +18,7 @@ def makeChl(channels, expand_ratio, min_channels=None):
 
 
 class EfficientNet(Backbone):
-    def __init__(self, type="b0", stoch_depth_prob=0.2, logits_out=None):
+    def __init__(self, type="b0", stoch_depth_prob=0.2):
         super(EfficientNet, self).__init__()
         type = type.lower()
         if type not in ["b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "v2_s", "v2_m", "v2_l"]:
@@ -28,18 +28,13 @@ class EfficientNet(Backbone):
         else:
             config = self._confEfficientNetV2(type)
 
-        if logits_out is None:
-            self.logits_out = len(config)
-        else:
-             self.logits_out = logits_out
-
-        self.layers = []
         total_block_len = 0
         stage_block_id = 0
         for _, _, _, _, _, _, k  in config:
             total_block_len += k
         in_channels = None
-        for t, ci, co, s, k, exp, n  in config:
+        self.layers = []
+        for t, ci, co, s, k, exp, n in config:
             if not self.layers:
                 self.layers.append(ConvBNActivation(3, ci, kernel_size=3, stride=2, activation=partial(nn.SiLU, True), padding=1))
                 in_channels = ci
@@ -57,7 +52,7 @@ class EfficientNet(Backbone):
                 in_channels = co
                 stage_block_id += 1
             self.layers.append(nn.Sequential(*block))
-
+        self.layers = nn.Sequential(*self.layers)
         channels_classifier = 1280 if type[0] != 'b' else 4 * in_channels
 
         self.Classifier = nn.Sequential(
@@ -71,14 +66,9 @@ class EfficientNet(Backbone):
         self._init_weight()
 
     def forward(self, x):
-        logit_out = []
-        y = self.layers[0](x)
-        for idx, layer in self.layers[1:]:
-            y = layer(y)
-            if idx in self.logits_out and self._backbone:
-                logit_out.append(y)
+        y = self.layers(x)
         if self._backbone:
-            return logit_out
+            return y
         else:
             return self.Classifier(y)
 
@@ -97,6 +87,11 @@ class EfficientNet(Backbone):
         config_inv_residual = [
             ["MBConvBlock", 32, 16, 1, 3, 1, 1],
             ["MBConvBlock", 16, 24, 2, 3, 6, 2],
+            ["MBConvBlock", 24, 40, 2, 5, 6, 2],
+            ["MBConvBlock", 40, 80, 2, 3, 6, 3],
+            ["MBConvBlock", 80, 112, 1, 5, 6, 3],
+            ["MBConvBlock", 112, 192, 2, 5, 6, 4],
+            ["MBConvBlock", 192, 320, 1, 3, 6, 1]
         ]
         width, depth = config_width_depth[type]
         for idx in range(len(config_inv_residual)):
@@ -225,6 +220,6 @@ class MBConvBlock(nn.Module):
 if __name__ == "__main__":
     import torchsummary
     import torchvision.models
-    mdl = EfficientNet(type="b7").cuda()
-    mdl.classifier()
+    mdl = EfficientNet(type="b0")
+    mdl = mdl.cuda()
     torchsummary.summary(mdl, (3, 224, 224))
