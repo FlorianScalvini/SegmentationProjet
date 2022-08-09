@@ -216,14 +216,8 @@ class HarDBlock(nn.Module):
         keepBase (bool, optional): A bool value indicates whether concatenating the first layer. Default: False.
     """
 
-    def __init__(self,
-                 base_channels,
-                 growth_rate,
-                 grmul,
-                 n_layers,
-                 keepBase=False):
+    def __init__(self, channels, growth_rate, n_layers):
         super(HarDBlock, self).__init__()
-        self.keepBase = keepBase
         self.links = []
         layers_ = []
         self.out_channels = 0

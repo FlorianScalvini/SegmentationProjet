@@ -220,6 +220,7 @@ class BGALayer(nn.Module):
         return out
 
 
+
 class SegHead(nn.Module):
     def __init__(self, in_dim, mid_dim, num_classes):
         super().__init__()
