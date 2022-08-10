@@ -5,11 +5,14 @@ from BaseModel import BaseModel
 from models.module import *
 from models.bisenetv2 import StemBlock
 from models.backbone.EfficientNet import MBConvBlock
+
+
 class NewModel(nn.Module):
     def __init__(self, num_classes):
         self.db = DetailBranch()
         self.sb = SemanticBranch()
-        self.
+
+        self.ffm = FeatureFusionModule(in_chan=)
         self.aux_head1 = SegHead(C1, C1, num_classes)
         self.aux_head2 = SegHead(C3, C3, num_classes)
         self.aux_head3 = SegHead(C4, C4, num_classes)
@@ -21,17 +24,21 @@ class NewModel(nn.Module):
     def forward(self,  x_color, x_depth):
         dfm = self.db( x_color, x_depth)
         feat1, feat2, feat3, feat4, sfm = self.sb(x_color)
-        out = self.head(self.bga(dfm, sfm))
+
+
+
+        y = self.head(self.bga(dfm, sfm))
         if not self.training:
-            out_list = out
+            y = nn.functional.interpolate(y, x_color.shape[2:], mode='bilinear', align_corners=True)
         else:
             out_1 = self.aux_head1(feat1)
             out_2 = self.aux_head2(feat2)
             out_3 = self.aux_head3(feat3)
             out_4 = self.aux_head4(feat4)
-            out_list = [out, out_1, out_2, out_3, out_4]
-        out_list = [nn.functional.interpolate(out_list, x_color.shape[2:], mode='bilinear', align_corners=self.align_corners) for out in out_list]
+            out_list = [y, out_1, out_2, out_3, out_4]
+            out_list = [nn.functional.interpolate(out_list, x_color.shape[2:], mode='bilinear', align_corners=self.align_corners) for out in out_list]
         return out_list
+from models.backbone.EfficientNet import MBConvBlock, FusedMBConv
 
 
 
@@ -78,11 +85,12 @@ class SegHead(nn.Module):
 
 
 class FeatureFusionModule(nn.Module):
-    def __init__(self, in_chan, out_chan):
+
+    def __init__(self, in_channel, out_channel):
         super(FeatureFusionModule, self).__init__()
-        self.convblk = ConvBNRelu(in_chan, out_chan, kernel_size=1, stride=1, padding=0)
-        self.conv1 = nn.Conv2d(out_chan,out_chan // 4, kernel_size=1, stride=1, padding=0, bias=False)
-        self.conv2 = nn.Conv2d(out_chan // 4, out_chan, kernel_size=1, stride=1, padding=0, bias=False)
+        self.convblk = ConvBNRelu(in_channel, out_channel, kernel_size=1, stride=1, padding=0)
+        self.conv1 = nn.Conv2d(out_channel,out_channel // 4, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv2 = nn.Conv2d(out_channel // 4, out_channel, kernel_size=1, stride=1, padding=0, bias=False)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
         self.init_weight()
@@ -116,3 +124,13 @@ class FeatureFusionModule(nn.Module):
             elif isinstance(module, nn.BatchNorm2d):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
+
+
+class FusionSpatialAttentionModule(nn.Module):
+    def __init__(self, in_channels):
+        super(FusionSpatialAttentionModule, self).__init__()
+        self.sam = SpatialAM()
+
+        return
+
+    def forward(self, x):

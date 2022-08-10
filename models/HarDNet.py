@@ -23,7 +23,7 @@ class HarDNet(BaseModel):
     [Real Time] The FC-HardDNet 70 implementation based on PaddlePaddle.
     The original article refers to
         Chao, Ping, et al. "HarDNet: A Low Memory Traffic Network"
-        (https://arxiv.org/p df/1909.00948.pdf)
+        (https://arxiv.org/pdf/1909.00948.pdf)
 
     Args:
         num_classes (int): The unique number of target classes.
