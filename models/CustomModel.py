@@ -7,9 +7,9 @@ from models.bisenetv2 import StemBlock
 from models.backbone.EfficientNet import MBConvBlock
 class NewModel(nn.Module):
     def __init__(self, num_classes):
-        self.db = DetailBranch()
-        self.sb = SemanticBranch()
-        self.
+        self.db = DetailBranch(channel_stage=)
+        self.sb = SemanticBranch(channel_stage= )
+        self.ffm = FeatureFusionModule(in_channels= , out_channels=)
         self.aux_head1 = SegHead(C1, C1, num_classes)
         self.aux_head2 = SegHead(C3, C3, num_classes)
         self.aux_head3 = SegHead(C4, C4, num_classes)
@@ -21,6 +21,7 @@ class NewModel(nn.Module):
     def forward(self,  x_color, x_depth):
         dfm = self.db( x_color, x_depth)
         feat1, feat2, feat3, feat4, sfm = self.sb(x_color)
+        out = self.head(self)
         out = self.head(self.bga(dfm, sfm))
         if not self.training:
             out_list = out
@@ -36,13 +37,41 @@ class NewModel(nn.Module):
 
 
 class DetailBranch(nn.Module):
-    def __init__(self):
+    def __init__(self, channel_stage):
         super(DetailBranch, self).__init__()
-        self
+        act_layer = partial(nn.SiLU, True)
+        C1, C2, C3 = channel_stage
+        self.D1 = ConvBNActivation(in_channels=C1, out_channels=C2, kernel_size=3, activation=act_layer)
+        self.DColor = nn.Sequential(
+            ConvBNActivation(in_channels=3, out_channels=C1, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C1, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C2, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C3, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, activation=act_layer),
+        )
+
+        self.DDepth = nn.Sequential(
+            ConvBNActivation(in_channels=3, out_channels=C1, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C1, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C2, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C3, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, activation=act_layer),
+        )
+        self.fatt = FusionAttentionSpatialAtt()
         return
 
     def forward(self, x_color, x_depth):
-        return
+        y_depth = self.DDepth(x_depth)
+        y_color = self.DColor(x_color)
+        y = self.fatt(y_color, y_depth)
+        return y
+
 
 class SemanticBranch(nn.Module):
     def __init__(self, channel_stage):
@@ -78,11 +107,11 @@ class SegHead(nn.Module):
 
 
 class FeatureFusionModule(nn.Module):
-    def __init__(self, in_chan, out_chan):
+    def __init__(self, in_channels, out_channels):
         super(FeatureFusionModule, self).__init__()
-        self.convblk = ConvBNRelu(in_chan, out_chan, kernel_size=1, stride=1, padding=0)
-        self.conv1 = nn.Conv2d(out_chan,out_chan // 4, kernel_size=1, stride=1, padding=0, bias=False)
-        self.conv2 = nn.Conv2d(out_chan // 4, out_chan, kernel_size=1, stride=1, padding=0, bias=False)
+        self.convblk = ConvBNRelu(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
+        self.conv1 = nn.Conv2d(out_channels, out_channels // 4, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv2 = nn.Conv2d(out_channels // 4, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
         self.init_weight()
@@ -116,3 +145,16 @@ class FeatureFusionModule(nn.Module):
             elif isinstance(module, nn.BatchNorm2d):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
+
+class FusionAttentionSpatialAtt(nn.Module):
+    def __init__(self):
+        super(FusionAttentionSpatialAtt, self).__init__()
+        self.spatt = SpatialAttention()
+
+    def forward(self, x_1, x_2):
+        y = x_1 + x_2
+        y_c = self.spatt(y)
+        y_1 = y_c * x_1
+        y_2 = y_c * x_2
+        y = y_1 + y_2
+        return y

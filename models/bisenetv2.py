@@ -77,6 +77,14 @@ class DetailBranch(nn.Module):
         y = self.S3(y)
         return y
 
+
+if __name__ == "__main__":
+    import torchsummary
+    import torchvision.models
+    mdl = DetailBranch(64, 64, 128)
+    mdl = mdl.cuda()
+    torchsummary.summary(mdl, (3, 224, 224))
+
 class SegmenticBranch(nn.Module):
     def __init__(self, stage_channel):
         super(SegmenticBranch, self).__init__()
