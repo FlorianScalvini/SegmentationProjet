@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.module import *
-from models.module import ConvBNRelu, ConvBN
+
 
 class UAFM(nn.Module):
     """
@@ -58,6 +58,22 @@ class ChannelAM(nn.Module):
         out = nn.functional.sigmoid(out)
         return out
 
+class ChannelAttention(nn.Module):
+    def __init__(self, gate_channels ,reduction_ratio=16):
+        super(ChannelAttention, self).__init__()
+        self.mlp = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(gate_channels, gate_channels // reduction_ratio),
+            nn.ReLU(),
+            nn.Linear(gate_channels // reduction_ratio, gate_channels)
+        )
+
+    def forward(self, x):
+        mavg = self.mlp(F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3))))
+        mmax = self.mlp(F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3))))
+        scale = F.sigmoid(mavg + mmax).unsqueeze(2).unsqueeze(3).expand_as(x)
+        return x * scale
+
 
 class SpatialAttention(nn.Module):
     def __init__(self, kernel_size=7):
@@ -71,6 +87,28 @@ class SpatialAttention(nn.Module):
         x = torch.cat([avg_out, max_out], dim=1)
         x = self.conv1(x)
         return self.sigmoid(x)
+
+class SpatialAM(nn.Module):
+    def __init__(self, avgmax=True):
+        super(SpatialAM, self).__init__()
+        if avgmax:
+            self.atten = avgMaxPoolReduceChannel()
+            self.conv = nn.Sequential(
+                ConvBNRelu(4, 2, kernel_size=3, padding=1, bias=False),
+                ConvBN(2, 1, kernel_size=3, padding=1, bias=False))
+        else:
+            self.atten = avgPoolReduceChannel()
+            self.conv = nn.Sequential(
+                ConvBNRelu(2, 2, kernel_size=3, padding=1, bias=False),
+                ConvBN(2, 1, kernel_size=3, padding=1, bias=False))
+
+    def forward(self, x, y):
+        out = self.atten(x,y)
+        out = self.conv(out)
+        out = nn.functional.sigmoid(out)
+        return out
+
+
 
 
 

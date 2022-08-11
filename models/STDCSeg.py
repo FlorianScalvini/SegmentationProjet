@@ -25,7 +25,6 @@ class STDCSeg(BaseModel):
         self.pretrained = pretrained
         self.init_weight()
 
-
     def forward(self, x):
         x_size = x.size()[2:]
         feat_res2, feat_res4, feat_res8, feat_res16, feat_cp8, feat_cp16 = self.contextPath(x)

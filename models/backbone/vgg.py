@@ -1,4 +1,4 @@
-from Backbone import Backbone
+from models.backbone import Backbone
 import torch.nn as nn
 from models.module import ConvBNRelu, ConvAct
 _config = {

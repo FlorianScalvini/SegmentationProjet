@@ -18,10 +18,10 @@ class BisenetV2(BaseModel):
         self.sb = SegmenticBranch(sb_channels)
 
         self.bga = BGALayer(mid_channels, align_corners)
-        self.aux_head1 = SegHead(C1, C1, num_classes)
-        self.aux_head2 = SegHead(C3, C3, num_classes)
-        self.aux_head3 = SegHead(C4, C4, num_classes)
-        self.aux_head4 = SegHead(C5, C5, num_classes)
+        self.aux_head1 = SegHead(C1, 64, num_classes)
+        self.aux_head2 = SegHead(C3, 64, num_classes)
+        self.aux_head3 = SegHead(C4, 64, num_classes)
+        self.aux_head4 = SegHead(C5, 64, num_classes)
         self.head = SegHead(mid_channels, mid_channels, num_classes)
         self.init_weight()
 
@@ -77,6 +77,14 @@ class DetailBranch(nn.Module):
         y = self.S3(y)
         return y
 
+
+if __name__ == "__main__":
+    import torchsummary
+    import torchvision.models
+    mdl = DetailBranch(64, 64, 128)
+    mdl = mdl.cuda()
+    torchsummary.summary(mdl, (3, 224, 224))
+
 class SegmenticBranch(nn.Module):
     def __init__(self, stage_channel):
         super(SegmenticBranch, self).__init__()
@@ -99,9 +107,9 @@ class SegmenticBranch(nn.Module):
     def forward(self, x):
         y_4 = self.stem(x)
         y_8 = self.stage3(y_4)
-        y_16 = self.stage3(y_8)
-        y_32 = self.stage3(y_16)
-        out_32 = self.stage3(y_32)
+        y_16 = self.stage4(y_8)
+        y_32 = self.stage5(y_16)
+        out_32 = self.contextEmBlock(y_32)
         return y_4, y_8, y_16, y_32, out_32
 
 class ContextEmdbedBlock(nn.Module):
@@ -128,14 +136,14 @@ class StemBlock(nn.Module):
             ConvBNRelu(in_channels=out_channels, out_channels=out_channels // 2, kernel_size=1, stride=1, padding=0, bias=False),
             ConvBNRelu(in_channels=out_channels // 2, out_channels=out_channels, kernel_size=3, stride=2, padding=1, bias=False)
         )
-        self.mxPool = nn.MaxPool2d(kernel_size=3, stride=2)
+        self.mxPool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.conv_out = ConvBNRelu(in_channels=out_channels * 2, out_channels=out_channels, kernel_size=3, padding=1, bias=False)
 
     def forward(self, x):
         y = self.conv(x)
         y_l = self.conv_l(y)
         y_r = self.mxPool(y)
-        y = torch.cat((y_l, y_r))
+        y = torch.cat((y_l, y_r), dim=1)
         y = self.conv_out(y)
         return y
 

@@ -7,13 +7,14 @@
         "n_gpu": 1
     },
     "arch": {
-        "type": "STDCSeg",
+        "type": "CustomModel",
         "pretrained": null,
         "args": {
+            "num_classes" : 19
         },
         "backbone":
         {
-            "type": "STDC",
+            "type": null,
             "args":
             {
 
