@@ -16,7 +16,6 @@ class BisenetV2(BaseModel):
 
         self.db = DetailBranch(db_channels)
         self.sb = SegmenticBranch(sb_channels)
-
         self.bga = BGALayer(mid_channels, align_corners)
         self.aux_head1 = SegHead(C1, 64, num_classes)
         self.aux_head2 = SegHead(C3, 64, num_classes)
@@ -30,14 +29,14 @@ class BisenetV2(BaseModel):
         feat1, feat2, feat3, feat4, sfm = self.sb(x)
         out = self.head(self.bga(dfm, sfm))
         if not self.training:
-            out_list = out
+            out_list = nn.functional.interpolate(out, x.shape[2:], mode='bilinear', align_corners=True)
         else:
             out_1 = self.aux_head1(feat1)
             out_2 = self.aux_head2(feat2)
             out_3 = self.aux_head3(feat3)
             out_4 = self.aux_head4(feat4)
             out_list = [out, out_1, out_2, out_3, out_4]
-        out_list = [nn.functional.interpolate(out_list, x.shape[2:], mode='bilinear', align_corners=self.align_corners) for out in out_list]
+        out_list = [nn.functional.interpolate(out, x.shape[2:], mode='bilinear', align_corners=True) for out in out_list]
         return out_list
 
     def init_weights(self):
