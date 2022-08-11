@@ -7,68 +7,127 @@ from models.bisenetv2 import StemBlock
 from models.backbone.EfficientNet import MBConvBlock
 
 
-class NewModel(nn.Module):
+class CustomModel(nn.Module):
     def __init__(self, num_classes):
-        self.db = DetailBranch()
-        self.sb = SemanticBranch()
+        super(CustomModel, self).__init__()
+        C1, C2, C3, C4, C5 = 16, 32, 64, 128, 256
 
-        self.ffm = FeatureFusionModule(in_chan=)
-        self.aux_head1 = SegHead(C1, C1, num_classes)
+        config_semantic = [
+            [C1, C2, 3, 6, 2],
+            [C2, C3, 5, 6, 2],
+            [C3, C4, 3, 6, 3],
+            [C4, C5, 5, 6, 3],
+        ]
+        db_stage = (64, 128, C5)
+        self.db = DetailBranch(channel_stage=db_stage)
+        self.sb = SemanticBranch(config=config_semantic)
+        self.ffm = FeatureFusionModule(in_channels=256, out_channels=256)
+        self.conv_out = SegHead(256, 256, num_classes)
+        self.aux_head1 = SegHead(C2, C2, num_classes)
         self.aux_head2 = SegHead(C3, C3, num_classes)
         self.aux_head3 = SegHead(C4, C4, num_classes)
         self.aux_head4 = SegHead(C5, C5, num_classes)
-        self.head = SegHead(mid_channels, mid_channels, num_classes)
-        self.init_weight()
         return
 
-    def forward(self,  x_color, x_depth):
-        dfm = self.db( x_color, x_depth)
-        feat1, feat2, feat3, feat4, sfm = self.sb(x_color)
-
-
-
-        y = self.head(self.bga(dfm, sfm))
+    def forward(self,  x_color):
+        dfm = self.db( x_color, x_color)
+        feat_4, feat_8, feat_16, feat32 = self.sb(x_color)
+        out = self.head(self.bga(dfm, feat32))
         if not self.training:
-            y = nn.functional.interpolate(y, x_color.shape[2:], mode='bilinear', align_corners=True)
+            out_list = nn.functional.interpolate(out, x_color.shape[2:], mode='bilinear', align_corners=self.align_corners)
         else:
-            out_1 = self.aux_head1(feat1)
-            out_2 = self.aux_head2(feat2)
-            out_3 = self.aux_head3(feat3)
+            out_1 = self.aux_head1(feat_4)
+            out_2 = self.aux_head2(feat_8)
+            out_3 = self.aux_head3(f)
             out_4 = self.aux_head4(feat4)
-            out_list = [y, out_1, out_2, out_3, out_4]
+            out_list = [out, out_1, out_2, out_3, out_4]
             out_list = [nn.functional.interpolate(out_list, x_color.shape[2:], mode='bilinear', align_corners=self.align_corners) for out in out_list]
         return out_list
-from models.backbone.EfficientNet import MBConvBlock, FusedMBConv
-
 
 
 class DetailBranch(nn.Module):
-    def __init__(self):
+    def __init__(self, channel_stage):
         super(DetailBranch, self).__init__()
-        self
+        act_layer = partial(nn.SiLU, True)
+        C1, C2, C3 = channel_stage
+        self.D1 = ConvBNActivation(in_channels=C1, out_channels=C2, kernel_size=3, activation=act_layer)
+        self.DColor = nn.Sequential(
+            ConvBNActivation(in_channels=3, out_channels=C1, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C1, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C2, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C3, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, activation=act_layer),
+        )
+
+        self.DDepth = nn.Sequential(
+            ConvBNActivation(in_channels=3, out_channels=C1, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C1, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C2, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C3, kernel_size=3, stride=2, activation=act_layer),
+            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, activation=act_layer),
+            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, activation=act_layer),
+        )
+        self.fatt = FusionAttentionSpatialAtt()
         return
 
     def forward(self, x_color, x_depth):
-        return
+        y_depth = self.DDepth(x_depth)
+        y_color = self.DColor(x_color)
+        y = self.fatt(y_color, y_depth)
+        return y
+
 
 class SemanticBranch(nn.Module):
-    def __init__(self, channel_stage):
+    def __init__(self, config, reduction_ratio=16):
         super(SemanticBranch, self).__init__()
-        C1, C2, C3, C4 = channel_stage
-        self.stem = StemBlock(out_channels=C1)
-        self.block_1 = nn.Sequential(
-            MBConvBlock(in_channels=C1, out_channels=C2, expand_ratio= , stride= , kernel_size=, stoch_depth_prob=0.2),
-            MBConvBlock(in_channels=C1, out_channels=C2, expand_ratio= , stride= , kernel_size=, stoch_depth_prob=0.2)
-        )
-        self.block_2 = None
-        self.block_3 = None
-        self.block_4 = None
+        #self.stem = StemBlock(out_channels=config[0][0])
+        id_stage_block = 0
+        total_stage_block = 0
+        for i in range(len(config)):
+            total_stage_block = total_stage_block + config[i][-1]
+
+        self.conv = ConvBNActivation(3, config[0][0], kernel_size=3, stride=2, activation=partial(nn.SiLU, True), padding=1)
+
+        self.stage1, id_stage_block = _make_layer(config[0], id_stage_block=id_stage_block, total_block_len=total_stage_block,
+                                   stoch_depth_prob=0.2)
+        self.stage2, id_stage_block = _make_layer(config[1], id_stage_block=id_stage_block, total_block_len=total_stage_block,
+                                   stoch_depth_prob=0.2)
+        self.stage3, id_stage_block = _make_layer(config[2], id_stage_block=id_stage_block, total_block_len=total_stage_block,
+                                   stoch_depth_prob=0.2)
+        self.stage4, _ = _make_layer(config[3], id_stage_block=id_stage_block, total_block_len=total_stage_block,
+                                   stoch_depth_prob=0.2)
+        self.att = ChannelAttention(gate_channels=config[3][1], reduction_ratio=reduction_ratio)
         return
 
     def forward(self, x):
-        y = self.stem(x)
-        y =
-        return
+        y_2 = self.conv(x)
+        y_4 = self.stage1(y_2)
+        y_8 = self.stage2(y_4)
+        y_16 = self.stage3(y_8)
+        y_32 = self.stage4(y_16)
+        return y_4, y_8, y_16, y_32
+
+
+
+def _make_layer(config, id_stage_block, total_block_len, stoch_depth_prob=0.2):
+    layers = []
+    in_channels, out_channels, kernel_size, exp, n = config
+    for ni in range(n):
+        sd_prob = stoch_depth_prob * float(id_stage_block) / total_block_len
+        if ni == 0:
+            layers.append(MBConvBlock(in_channels=in_channels, out_channels=out_channels, expand_ratio=exp, stride=2,
+                                      kernel_size=kernel_size, stoch_depth_prob=sd_prob))
+        else:
+            layers.append(MBConvBlock(in_channels=out_channels, out_channels=out_channels, expand_ratio=exp, stride=1,
+                                      kernel_size=kernel_size,stoch_depth_prob=sd_prob))
+        id_stage_block = id_stage_block + 1
+    return nn.Sequential(*layers), id_stage_block
+
 
 class SegHead(nn.Module):
     def __init__(self, in_dim, mid_dim, num_classes):
@@ -77,20 +136,29 @@ class SegHead(nn.Module):
         self.drop = nn.Dropout(0.1)
         self.conv2 = nn.Conv2d(in_channels=mid_dim, out_channels=num_classes, kernel_size=1, stride=1, padding=0,
                                bias=False)
+        self.init_weight()
+
     def forward(self, x):
         y = self.conv1(x)
         y = self.drop(y)
         y = self.conv2(y)
         return y
 
+    def init_weight(self):
+        for ly in self.children():
+            if isinstance(ly, nn.Conv2d):
+                nn.init.kaiming_normal_(ly.weight, a=1)
+                if ly.bias is not None:
+                    nn.init.constant_(ly.bias, 0)
+
+
 
 class FeatureFusionModule(nn.Module):
-
-    def __init__(self, in_channel, out_channel):
+    def __init__(self, in_channels, out_channels):
         super(FeatureFusionModule, self).__init__()
-        self.convblk = ConvBNRelu(in_channel, out_channel, kernel_size=1, stride=1, padding=0)
-        self.conv1 = nn.Conv2d(out_channel,out_channel // 4, kernel_size=1, stride=1, padding=0, bias=False)
-        self.conv2 = nn.Conv2d(out_channel // 4, out_channel, kernel_size=1, stride=1, padding=0, bias=False)
+        self.convblk = ConvBNRelu(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
+        self.conv1 = nn.Conv2d(out_channels, out_channels // 4, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv2 = nn.Conv2d(out_channels // 4, out_channels, kernel_size=1, stride=1, padding=0, bias=False)
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
         self.init_weight()
@@ -114,23 +182,23 @@ class FeatureFusionModule(nn.Module):
                 if ly.bias is not None:
                     nn.init.constant_(ly.bias, 0)
 
-    def get_params(self):
-        wd_params, nowd_params = [], []
-        for name, module in self.named_modules():
-            if isinstance(module, (nn.Linear, nn.Conv2d)):
-                wd_params.append(module.weight)
-                if module.bias is not None:
-                    nowd_params.append(module.bias)
-            elif isinstance(module, nn.BatchNorm2d):
-                nowd_params += list(module.parameters())
-        return wd_params, nowd_params
 
+class FusionAttentionSpatialAtt(nn.Module):
+    def __init__(self):
+        super(FusionAttentionSpatialAtt, self).__init__()
+        self.spatt = SpatialAttention()
 
-class FusionSpatialAttentionModule(nn.Module):
-    def __init__(self, in_channels):
-        super(FusionSpatialAttentionModule, self).__init__()
-        self.sam = SpatialAM()
+    def forward(self, x_1, x_2):
+        y = x_1 + x_2
+        y_c = self.spatt(y)
+        y_1 = y_c * x_1
+        y_2 = y_c * x_2
+        y = y_1 + y_2
+        return y
 
-        return
-
-    def forward(self, x):
+if __name__ == "__main__":
+    import torchsummary
+    import torchvision.models
+    mdl = CustomModel(num_classes=19)
+    mdl = mdl.cuda()
+    torchsummary.summary(mdl, (3, 224, 224))
