@@ -66,13 +66,13 @@ class Cityscapes(BaseDataSet):
         self.file_list = list()
         self.split = split.lower()
         self.ignore_index = 0
+        self.depth = depth
         img_dir = os.path.join(self.root, 'leftImg8bit')
         label_dir = os.path.join(self.root, 'gtFine')
         if self.root is None or not os.path.isdir(self.root) or not os.path.isdir(img_dir) \
                 or not os.path.isdir(label_dir):
             raise ValueError("The dataset is not Found.")
         self._set_files()
-        self.depth = depth
 
     def _set_files(self):
         assert (self.split in ['train', 'val'])

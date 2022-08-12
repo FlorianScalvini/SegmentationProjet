@@ -47,8 +47,8 @@ class CustomModel(nn.Module):
         self.aux_head4 = SegHead(C5, C5, num_classes)
         return
 
-    def forward(self,  x_color):
-        dfm = self.db(x_color, x_color)
+    def forward(self,  x_color, x_depth):
+        dfm = self.db(x_color, x_depth)
         feat_4, feat_8, feat_16, feat_32 = self.sb(x_color)
         out_sb = self.conv1x1(feat_32)
         out_sb = F.interpolate(out_sb, size=dfm.shape[2:], mode='bilinear', align_corners=True)
@@ -80,7 +80,7 @@ class DetailBranch(nn.Module):
             ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, padding=1, activation=act_layer),
         )
         self.b_depth = nn.Sequential(
-            ConvBNActivation(in_channels=3, out_channels=C1, kernel_size=3, stride=2, padding=1, activation=act_layer),
+            ConvBNActivation(in_channels=1, out_channels=C1, kernel_size=3, stride=2, padding=1, activation=act_layer),
             ConvBNActivation(in_channels=C1, out_channels=C1, kernel_size=3, stride=1, padding=1, activation=act_layer),
             ConvBNActivation(in_channels=C1, out_channels=C2, kernel_size=3, stride=2, padding=1, activation=act_layer),
             ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, padding=1, activation=act_layer),

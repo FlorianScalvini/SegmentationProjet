@@ -89,7 +89,7 @@
 
     "loss" : {
         "type": "CrossEntropyLoss2d",
-        "coef" : [1,0.2,0.2],
+        "coef" : [1,0.2,0.2,0.2,0.2],
         "args": {
             "ignore_index": 255
         }
