@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional
-from BaseModel import BaseModel
+from models.BaseModel import BaseModel
 from models.module import *
 
 
@@ -22,7 +22,6 @@ class BisenetV2(BaseModel):
         self.aux_head3 = SegHead(C4, 64, num_classes)
         self.aux_head4 = SegHead(C5, 64, num_classes)
         self.head = SegHead(mid_channels, mid_channels, num_classes)
-        self.init_weight()
 
     def forward(self, x):
         dfm = self.db(x)
@@ -36,7 +35,7 @@ class BisenetV2(BaseModel):
             out_3 = self.aux_head3(feat3)
             out_4 = self.aux_head4(feat4)
             out_list = [out, out_1, out_2, out_3, out_4]
-        out_list = [nn.functional.interpolate(out, x.shape[2:], mode='bilinear', align_corners=True) for out in out_list]
+            out_list = [nn.functional.interpolate(out, x.shape[2:], mode='bilinear', align_corners=True) for out in out_list]
         return out_list
 
     def init_weights(self):
@@ -56,18 +55,18 @@ class DetailBranch(nn.Module):
         super(DetailBranch, self).__init__()
         C1, C2, C3 = stage_channels
         self.S1 = nn.Sequential(
-            ConvBNRelu(3, C1, 3, stride=2),
-            ConvBNRelu(C1, C1, 3, stride=1),
+            ConvBNRelu(3, C1, 3, stride=2, padding=1),
+            ConvBNRelu(C1, C1, 3, stride=1, padding=1),
         )
         self.S2 = nn.Sequential(
-            ConvBNRelu(C1, C2, 3, stride=2),
-            ConvBNRelu(C2, C2, 3, stride=1),
-            ConvBNRelu(C2, C2, 3, stride=1),
+            ConvBNRelu(C1, C2, 3, stride=2, padding=1),
+            ConvBNRelu(C2, C2, 3, stride=1, padding=1),
+            ConvBNRelu(C2, C2, 3, stride=1, padding=1),
         )
         self.S3 = nn.Sequential(
-            ConvBNRelu(C2, C3, 3, stride=2),
-            ConvBNRelu(C3, C3, 3, stride=1),
-            ConvBNRelu(C3, C3, 3, stride=1),
+            ConvBNRelu(C2, C3, 3, stride=2, padding=1),
+            ConvBNRelu(C3, C3, 3, stride=1, padding=1),
+            ConvBNRelu(C3, C3, 3, stride=1, padding=1),
         )
 
     def forward(self, x):
@@ -77,28 +76,21 @@ class DetailBranch(nn.Module):
         return y
 
 
-if __name__ == "__main__":
-    import torchsummary
-    import torchvision.models
-    mdl = DetailBranch(64, 64, 128)
-    mdl = mdl.cuda()
-    torchsummary.summary(mdl, (3, 224, 224))
-
 class SegmenticBranch(nn.Module):
     def __init__(self, stage_channel):
         super(SegmenticBranch, self).__init__()
         C2, C3, C4, C5 = stage_channel
         self.stem = StemBlock(C2)
         self.stage3 = nn.Sequential(
-            GatherAndExpansion2(C3,C3),
+            GatherAndExpansion2(C2, C3),
             GatherAndExpansion(C3)
         )
         self.stage4 = nn.Sequential(
-            GatherAndExpansion2(C4, C4),
+            GatherAndExpansion2(C3, C4),
             GatherAndExpansion(C4)
         )
         self.stage5 = nn.Sequential(
-            GatherAndExpansion2(C5,C5),
+            GatherAndExpansion2(C4,C5),
             GatherAndExpansion(C5)
         )
         self.contextEmBlock = ContextEmdbedBlock(C5)
@@ -156,11 +148,11 @@ class GatherAndExpansion2(nn.Module):
             ConvBNRelu(in_channels=in_channels, out_channels=in_channels, kernel_size=3, padding=1, stride=1, bias=False),
             ConvBN(in_channels=in_channels, out_channels=expand_ch, kernel_size=3, padding=1, stride=2, groups=in_channels, bias=False),
             ConvBN(in_channels=expand_ch, out_channels=expand_ch, kernel_size=1, padding=0, groups=expand_ch, bias=False),
-            ConvBN(in_channels=in_channels, out_channels=out_channels, kernel_size=1, padding=0, stride=1, bias=False)
+            ConvBN(in_channels=expand_ch, out_channels=out_channels, kernel_size=1, padding=0, stride=1, bias=False)
         )
         self.conv2 = nn.Sequential(
-            ConvBN(in_channels=in_channels, out_channels=in_channels, stride=2, padding=1),
-            ConvBN(in_channels=in_channels, out_channels=expand_ch, kernel_size=1, padding=0, stride=1, bias=False)
+            ConvBN(in_channels=in_channels, out_channels=in_channels, stride=2, padding=1, groups=in_channels),
+            ConvBN(in_channels=in_channels, out_channels=out_channels, kernel_size=1, padding=0, stride=1, bias=False)
         )
         self.relu = nn.ReLU()
 
@@ -210,8 +202,8 @@ class BGALayer(nn.Module):
             ConvBN(in_channels=out_channels, out_channels=out_channels, kernel_size=3, stride=2, padding=1, bias=False),
             nn.AvgPool2d(kernel_size=3, stride=2, padding=1, ceil_mode=False)
         )
-
         self.convOut = ConvBN(in_channels=out_channels, out_channels=out_channels, kernel_size=3, padding=1, bias=False)
+
 
     def forward(self, x_d, x_s):
         dsize = x_d.size()[2:]
@@ -223,7 +215,7 @@ class BGALayer(nn.Module):
         left = left1 * self.sigmoid(right1)
         right = left2 * right2
         right = nn.functional.interpolate(right, size=dsize, mode='bilinear', align_corners=self.align_corners)
-        out = self.conv(left + right)
+        out = self.convOut(left + right)
         return out
 
 
@@ -241,3 +233,17 @@ class SegHead(nn.Module):
         y = self.drop(y)
         y = self.conv2(y)
         return y
+
+
+if __name__ == "__main__":
+    import torchsummary
+    import torchvision.models
+    mdl = BisenetV2(num_classes=19)
+    mdl = mdl.cuda().eval()
+    torchsummary.summary(mdl, (3, 1024, 512))
+
+    from ptflops import get_model_complexity_info
+    macs, params = get_model_complexity_info(mdl, (3, 1024, 512), as_strings=True,
+                                             print_per_layer_stat=True, verbose=True)
+    print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
+    print('{:<30}  {:<8}'.format('Number of parameters: ', params))

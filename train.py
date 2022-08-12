@@ -63,7 +63,7 @@ class Trainer():
             device = torch.device('cpu')
         return device
 
-    def _train_epoch(self, epoch=None):
+    def _train_epoch(self, epoch=None, rgbd_train=False):
         num_classes = self.model.num_classes
         self.model.train()
         total_loss = 0.0
@@ -71,13 +71,16 @@ class Trainer():
         pred_area = torch.zeros(num_classes).to(self.device)
         label_area = torch.zeros(num_classes).to(self.device)
         tbar = tqdm(self.train_loader, ncols=130, position=0, leave=True)
-        for batch_idx, (data, target) in enumerate(tbar):
-            data = data.to(self.device)
+        for batch_idx, (img, depth_img, target) in enumerate(tbar):
+            img = img.to(self.device)
             target = target.to(self.device)
             self.optimizer.zero_grad()
             if self.scaler is not None:
                 with torch.cuda.amp.autocast():
-                    preds = self.model(data)
+                    if rgbd_train:
+                        preds = self.model(img, depth_img)
+                    else:
+                        preds = self.model(img)
                     loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
                                             coef=self.lossCoef).sum()
                     loss = loss.sum()
@@ -85,7 +88,10 @@ class Trainer():
                 self.scaler.step(optimizer=self.optimizer)
                 self.scaler.update()
             else:
-                preds = self.model(data)
+                if rgbd_train:
+                    preds = self.model(img, depth_img)
+                else:
+                    preds = self.model(img)
                 loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
                                         coef=self.lossCoef).sum()
                 loss.backward()

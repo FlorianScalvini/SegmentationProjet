@@ -44,16 +44,7 @@ class ConfigParser:
 
     def model(self):
         net = getattr(models, self.config['arch']['type'])
-        if 'backbone' in inspect.getfullargspec(net.__init__)[0]:
-            try:
-                net_backbone = getattr(models.backbone, self.config['arch']['backbone']['type'])
-                b_kwargs = self.config['arch']['backbone']['args']
-            except:
-                raise ValueError("Missing backbone value or incorrect config.json")
-        else:
-            net_backbone = None
-            b_kwargs = None
-        return net, self.config['arch']['args'], net_backbone,  b_kwargs
+        return net, self.config['arch']['args']
 
     def loss_config(self):
         lss = getattr(loss, self.config['loss']['type'])
@@ -98,11 +89,10 @@ class ConfigParser:
             val_data = dataset(**kwargs_dataset)
             val_loader = torch.utils.data.DataLoader(dataset=val_data, **kwargs_loader)
             dict_return["val_loader"] = val_loader
-        mdl, kwargs, bck_mdl, bck_kwargs = self.model()
-        bck_mdl = bck_mdl(**bck_kwargs)
+        mdl, kwargs = self.model()
         if 'num_classes' != kwargs.keys():
             kwargs["num_classes"] = train_data.num_classes
-        model = mdl(backbone=bck_mdl, **kwargs)
+        model = mdl(**kwargs)
         dict_return["model"] = model
         loss, kwargs, loss_coef = self.loss_config()
         loss = loss(**kwargs)

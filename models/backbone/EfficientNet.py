@@ -222,4 +222,4 @@ if __name__ == "__main__":
     import torchvision.models
     mdl = EfficientNet(type="b4")
     mdl = mdl.cuda()
-    torchsummary.summary(mdl, (3, 224, 224))
+    torchsummary.summary(mdl, (3, 2048, 1024))

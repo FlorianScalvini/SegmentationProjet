@@ -61,7 +61,7 @@ labels = [
 ]
 
 class Cityscapes(BaseDataSet):
-    def __init__(self, transforms, root, split='train', *args):
+    def __init__(self, transforms, root, split='train', depth=False, *args):
         super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms, labels=labels)
         self.file_list = list()
         self.split = split.lower()
@@ -72,22 +72,34 @@ class Cityscapes(BaseDataSet):
                 or not os.path.isdir(label_dir):
             raise ValueError("The dataset is not Found.")
         self._set_files()
+        self.depth = depth
 
     def _set_files(self):
         assert (self.split in ['train', 'val'])
         label_path = os.path.join(self.root, 'gtFine', self.split)
         image_path = os.path.join(self.root, 'leftImg8bit', self.split)
         assert os.listdir(image_path) == os.listdir(label_path)
-
         image_paths = glob.glob(image_path + '/**/*.png', recursive=True)
         label_paths = glob.glob(label_path + '/**/*gtFine_labelIds.png', recursive=True)
-        self.files = list(zip(image_paths, label_paths))
+
+        if self.depth:
+            depth_path = os.path.join(self.root, 'disparity', self.split)
+            depth_paths = glob.glob(depth_path + '/**/*.png', recursive=True)
+        else:
+
+            depth_paths = None
+        self.files = list(zip(image_paths, depth_paths, label_paths))
 
     def _load_data(self, index):
-        image_path, label_path = self.files[index]
+        image_path, depth_label, label_path = self.files[index]
         image = Image.open(image_path).convert('RGB')
         label = Image.open(label_path)
-        return image, label
+
+        if self.depth:
+            depth = Image.open(depth_label).convert("L")
+            return image, depth, label
+        else:
+            return image, label
 
 
 

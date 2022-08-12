@@ -5,7 +5,7 @@ np.set_printoptions(suppress=True)
 
 
 def evaluate(model, eval_loader, num_classes, device, criterion=None, precision='fp32', print_detail=True,
-             auc_roc=False, ignore_labels=None):
+             auc_roc=False, ignore_labels=None, rgbd_eval=False):
     model.eval()
     intersect = torch.zeros(num_classes).to(device)
     pred_area = torch.zeros(num_classes).to(device)
@@ -14,19 +14,25 @@ def evaluate(model, eval_loader, num_classes, device, criterion=None, precision=
 
     total_loss = 0
     with torch.no_grad():
-        for batch_idx, (data, target) in enumerate(tbar):
+        for batch_idx, (img, depth_img, target) in enumerate(tbar):
 
-            data = data.to(device)
+            img = img.to(device)
             target = target.to(device)
 
             if precision == 'fp16':
                 with torch.cuda.amp.autocast(enabled=True):
-                    preds = model(data)
+                    if rgbd_eval:
+                        preds = model(img, depth_img)
+                    else:
+                        preds = model(img)
                     if criterion is not None:
                         loss = criterion(preds, target)
                         total_loss += loss.sum()
             else:
-                preds = model(data)
+                if rgbd_eval:
+                    preds = model(img, depth_img)
+                else:
+                    preds = model(img)
                 if criterion is not None:
                     loss = criterion(preds, target)
                     total_loss += loss.sum()

@@ -11,14 +11,6 @@
         "pretrained": null,
         "args": {
             "num_classes" : 19
-        },
-        "backbone":
-        {
-            "type": null,
-            "args":
-            {
-
-            }
         }
     },
 
@@ -29,7 +21,8 @@
             "split": "train",
             "args": {
                 "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest",
-                "split": "val",
+                "split": "train",
+                "depth" : true,
                 "transforms": {
                     "RandomScale": {
                         "min": 0.5,
@@ -64,6 +57,7 @@
             "args": {
                 "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
                 "split": "val",
+                "depth" : true,
                 "transforms": {
                     "Resize": [2048,1024],
                     "RandomCrop": [1024,512],

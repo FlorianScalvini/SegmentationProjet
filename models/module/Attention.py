@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.module import *
-
+from math import log
 
 class UAFM(nn.Module):
     """
@@ -154,3 +154,4 @@ class meanMaxReduceHW(nn.Module):
         max_y = torch.amax(input=y, keepdim=True, dim=1)
         out = torch.cat([mean_x, max_x, mean_y, max_y])
         return out
+

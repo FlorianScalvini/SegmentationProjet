@@ -1,41 +1,45 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional
-from BaseModel import BaseModel
+from models.BaseModel import BaseModel
 from models.module import *
 from models.bisenetv2 import StemBlock
 from models.backbone.EfficientNet import MBConvBlock
 from utils.utils import make_divisible
 import math
 
-class CustomModel(nn.Module):
-    def __init__(self, num_classes, width_seg=1.0, depth_seg=1.0):
-        super(CustomModel, self).__init__()
-        C1, C2, C3, C4, C5, C6 = 16, 32, 64, 128, 256
-        D1, D2, D3, D4 = 2, 2, 3, 3
 
-        db_stage = (64, 128, C5)
-        config_semantic = [
+class CustomModel(nn.Module):
+    def __init__(self, num_classes, width_seg=1.0, depth_seg=1.0, conv_out=128):
+        super(CustomModel, self).__init__()
+        self.num_classes = num_classes
+        act_layer = partial(nn.ReLU, True)
+        C1, C2, C3, C4, C5, C6 = 16, 24, 40, 80, 112, conv_out
+        db_channels = (64, 64, conv_out)
+
+        config_sb = [
             [C1, C2, 3, 6, 2],
             [C2, C3, 5, 6, 2],
             [C3, C4, 3, 6, 3],
             [C4, C5, 5, 6, 3],
         ]
 
-        for idx in range(len(config_semantic)):
-            config_semantic[idx][0] = make_divisible(config_semantic[idx][1] * width_seg, 8)
-            config_semantic[idx][1] = make_divisible(config_semantic[idx][2] * width_seg, 8)
-            config_semantic[idx][-1] = int(math.ceil(config_semantic[idx][-1] * depth_seg))
+        for idx in range(len(config_sb)):
+            config_sb[idx][0] = make_divisible(config_sb[idx][0] * width_seg, 8)
+            config_sb[idx][1] = make_divisible(config_sb[idx][1] * width_seg, 8)
+            config_sb[idx][-1] = int(math.ceil(config_sb[idx][-1] * depth_seg))
 
 
 
         self.global_context = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
-            ConvBNActivation(in_channels=config_semantic[-1][1], out_channels=C5, kernel_size=1, bias=False))
+            ConvBNActivation(in_channels=config_sb[-1][1], out_channels=C6, kernel_size=1, bias=False))
 
-        self.db = DetailBranch(channel_stage=db_stage)
-        self.sb = SemanticBranch(config=config_semantic)
-        self.ffm = FeatureFusionModule(in_channels=C5*2, out_channels=C6)
+        self.db = DetailBranch(channel_stage=db_channels)
+        self.sb = SemanticBranch(config=config_sb)
+        self.conv1x1 = ConvBNActivation(in_channels=config_sb[-1][1], out_channels=conv_out, kernel_size=1, stride=1,
+                                        activation=act_layer)
+        self.ffm = FeatureFusionModule(in_channels=conv_out*2, out_channels=C6)
         self.head = SegHead(C6, C6, num_classes)
         self.aux_head1 = SegHead(C2, C2, num_classes)
         self.aux_head2 = SegHead(C3, C3, num_classes)
@@ -46,8 +50,9 @@ class CustomModel(nn.Module):
     def forward(self,  x_color):
         dfm = self.db(x_color, x_color)
         feat_4, feat_8, feat_16, feat_32 = self.sb(x_color)
-        feat_32i = F.interpolate(feat_32, size=dfm.shape[2:], mode='bilinear', align_corners=True)
-        out = self.head(self.ffm(dfm, feat_32i))
+        out_sb = self.conv1x1(feat_32)
+        out_sb = F.interpolate(out_sb, size=dfm.shape[2:], mode='bilinear', align_corners=True)
+        out = self.head(self.ffm(dfm, out_sb))
         if not self.training:
             out_list = nn.functional.interpolate(out, x_color.shape[2:], mode='bilinear', align_corners=True)
         else:
@@ -61,35 +66,41 @@ class CustomModel(nn.Module):
 
 
 class DetailBranch(nn.Module):
-    def __init__(self, channel_stage):
+    def __init__(self, channel_stage, act_layer=partial(nn.SiLU, True)):
         super(DetailBranch, self).__init__()
-        act_layer = partial(nn.SiLU, True)
         C1, C2, C3 = channel_stage
-        block_detail = nn.Sequential(
+
+
+        self.b_color = nn.Sequential(
             ConvBNActivation(in_channels=3, out_channels=C1, kernel_size=3, stride=2, padding=1, activation=act_layer),
             ConvBNActivation(in_channels=C1, out_channels=C1, kernel_size=3, stride=1, padding=1, activation=act_layer),
             ConvBNActivation(in_channels=C1, out_channels=C2, kernel_size=3, stride=2, padding=1, activation=act_layer),
             ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, padding=1, activation=act_layer),
+            ConvBNActivation(in_channels=C2, out_channels=C3, kernel_size=3, stride=2, padding=1, activation=act_layer),
+            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, padding=1, activation=act_layer),
+        )
+        self.b_depth = nn.Sequential(
+            ConvBNActivation(in_channels=3, out_channels=C1, kernel_size=3, stride=2, padding=1, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C1, kernel_size=3, stride=1, padding=1, activation=act_layer),
+            ConvBNActivation(in_channels=C1, out_channels=C2, kernel_size=3, stride=2, padding=1, activation=act_layer),
             ConvBNActivation(in_channels=C2, out_channels=C2, kernel_size=3, stride=1, padding=1, activation=act_layer),
             ConvBNActivation(in_channels=C2, out_channels=C3, kernel_size=3, stride=2, padding=1, activation=act_layer),
             ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, padding=1, activation=act_layer),
-            ConvBNActivation(in_channels=C3, out_channels=C3, kernel_size=3, stride=1, padding=1, activation=act_layer),
         )
 
-        self.DColor = block_detail
-        self.DDepth = block_detail
-        self.fatt = FusionAttentionSpatialAtt()
+        self.fAtt = FusionSpatialAttentionModule()
         return
 
     def forward(self, x_color, x_depth):
-        y_depth = self.DDepth(x_depth)
-        y_color = self.DColor(x_color)
-        y = self.fatt(y_color, y_depth)
+        y_depth = self.b_depth(x_depth)
+        y_color = self.b_color(x_color)
+        y = self.fAtt(y_color, y_depth)
         return y
 
 
+
 class SemanticBranch(nn.Module):
-    def __init__(self, config, reduction_ratio=16):
+    def __init__(self, config):
         super(SemanticBranch, self).__init__()
         #self.stem = StemBlock(out_channels=config[0][0])
         id_stage_block = 0
@@ -107,7 +118,6 @@ class SemanticBranch(nn.Module):
                                    stoch_depth_prob=0.2)
         self.stage4, _ = _make_layer(config[3], id_stage_block=id_stage_block, total_block_len=total_stage_block,
                                    stoch_depth_prob=0.2)
-        self.ch_att = ChannelAttention(gate_channels=config[3][1], reduction_ratio=reduction_ratio)
         return
 
     def forward(self, x):
@@ -116,8 +126,8 @@ class SemanticBranch(nn.Module):
         y_8 = self.stage2(y_4)
         y_16 = self.stage3(y_8)
         y_32 = self.stage4(y_16)
-        y_32 = self.ch_att(y_32)
         return y_4, y_8, y_16, y_32
+
 
 
 
@@ -159,7 +169,6 @@ class SegHead(nn.Module):
                     nn.init.constant_(ly.bias, 0)
 
 
-
 class FeatureFusionModule(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(FeatureFusionModule, self).__init__()
@@ -190,22 +199,30 @@ class FeatureFusionModule(nn.Module):
                     nn.init.constant_(ly.bias, 0)
 
 
-class FusionAttentionSpatialAtt(nn.Module):
+class FusionSpatialAttentionModule(nn.Module):
     def __init__(self):
-        super(FusionAttentionSpatialAtt, self).__init__()
-        self.spatt = SpatialAttention()
+        super(FusionSpatialAttentionModule, self).__init__()
+        self.spAtt_1 = SpatialAttention()
+        self.spAtt_2 = SpatialAttention()
 
     def forward(self, x_1, x_2):
-        y = x_1 + x_2
-        y_c = self.spatt(y)
-        y_1 = y_c * x_1
-        y_2 = y_c * x_2
+        y_1 = self.spAtt_1(x_1)
+        y_1 = y_1 * x_1
+        y_2 = self.spAtt_2(x_2)
+        y_2 = y_2 * x_2
         y = y_1 + y_2
         return y
+
 
 if __name__ == "__main__":
     import torchsummary
     import torchvision.models
     mdl = CustomModel(num_classes=19, width_seg=1.0, depth_seg=1.0)
     mdl = mdl.cuda().eval()
-    torchsummary.summary(mdl, (3, 224, 224))
+    torchsummary.summary(mdl, (3, 1024, 512))
+    from ptflops import get_model_complexity_info
+    macs, params = get_model_complexity_info(mdl, (3, 2048, 1024), as_strings=True,
+                                             print_per_layer_stat=True, verbose=True)
+    print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
+    print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+
