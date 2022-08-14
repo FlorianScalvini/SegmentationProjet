@@ -9,10 +9,9 @@ from utils.utils import make_divisible
 import math
 
 
-class CustomModel(nn.Module):
+class CustomModel(BaseModel):
     def __init__(self, num_classes, width_seg=1.0, depth_seg=1.0, conv_out=128):
-        super(CustomModel, self).__init__()
-        self.num_classes = num_classes
+        super(CustomModel, self).__init__(num_classes=num_classes, depth=True)
         act_layer = partial(nn.ReLU, True)
         C1, C2, C3, C4, C5, C6 = 16, 24, 40, 80, 112, conv_out
         db_channels = (64, 64, conv_out)

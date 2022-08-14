@@ -20,9 +20,8 @@
             "type": "Cityscapes",
             "split": "train",
             "args": {
-                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest",
+                "root": "E:\\Dataset\\leftImg8bit_trainvaltest",
                 "split": "train",
-                "depth" : true,
                 "transforms": {
                     "RandomScale": {
                         "min": 0.5,
@@ -55,19 +54,22 @@
         {
             "type": "Cityscapes",
             "args": {
-                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
+                "root": "E:\\Dataset\\leftImg8bit_trainvaltest",
                 "split": "val",
-                "depth" : true,
                 "transforms": {
-                    "Resize": [2048,1024],
-                    "RandomCrop": [1024,512],
-                    "Rotate": null,
-                    "HorizontalFlip": null,
-                    "Blur": null,
-                    "Normalize":
+                    "commun": {
+                        "Resize": [1024, 512]
+                    },
+                    "depth":
                     {
-                        "mean": [0.485, 0.456, 0.406],
-                        "std": [0.229, 0.224, 0.225]
+                        "Blur": true
+                    },
+                    "color": {
+                        "Normalize":
+                        {
+                            "mean": [0.3257, 0.3690, 0.3223],
+                            "std": [0.2112, 0.2148, 0.2115]
+                        }
                     }
                 }
             }

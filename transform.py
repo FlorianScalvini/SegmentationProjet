@@ -6,66 +6,100 @@ import random
 import numpy as np
 
 
+def returnValue(image, depth, label):
+    if depth is not None:
+        return image, depth, label
+    else:
+        return image, label
+
+
 class Transform:
-    def __init__(self, transforms = []):
-        if not isinstance(transforms, list):
+    def __init__(self, transforms=None):
+        if transforms is None:
+            transforms = {
+                "commun" : [],
+                "depth": [],
+                "color": [],
+            }
+        if not isinstance(transforms, dict):
             raise TypeError('The transforms must be a list!')
         self.transforms = transforms
-        for i in range(len(self.transforms)):
-            if isinstance(self.transforms[i], Normalize):
-                self.transforms.insert(i, ToTensor())
-                return
-        self.transforms.append(ToTensor())
-
-    def __call__(self, image, label=None):
-        for transform in self.transforms:
-            if label is None:
-                image = transform(image, label)
-            else:
-                image, label = transform(image, label)
-        if label is None:
-            return image
+        if "commun" in transforms.keys():
+            self.trans_commun = transforms["commun"]
         else:
-            return image, label
+            self.trans_commun = []
 
+        if "depth" in transforms.keys():
+            self.trans_depth = transforms["depth"]
+            self._addTotensor(self.trans_depth)
+        else:
+            self.trans_depth = []
+
+        if "color" in transforms.keys():
+            self.trans_color = transforms["color"]
+            self._addTotensor(self.trans_color)
+        else:
+            self.trans_color = []
+
+    @staticmethod
+    def _addTotensor(transforms):
+        for i in range(len(transforms)):
+            if isinstance(transforms[i], ToTensor):
+                return
+            elif isinstance(transforms[i], Normalize):
+                transforms.insert(i, ToTensor())
+                return
+        transforms.append(ToTensor())
+        return transforms
+
+    def __call__(self, image, depth=None, label=None):
+        if depth is not None:
+            for transform in self.trans_commun:
+                image, depth, label = transform(image=image, depth=depth, label=label)
+            for transform in self.trans_depth:
+                depth = transform(image=depth)
+        else:
+            for transform in self.trans_commun:
+                image, label = transform(image=image, depth=None, label=label)
+        for transform in self.trans_color:
+            image, label = transform(image=image, label=label)
+        return returnValue(image=image, label=label, depth=depth)
 
 class ToTensor:
     def __init__(self):
-        self.toTensor =  T.ToTensor()
+        self.toTensor = T.ToTensor()
 
-    def __call__(self, image, label=None):
+    def __call__(self, image, label=None, depth=None):
         image = self.toTensor(image)
+        if depth is not None:
+            depth = torch.from_numpy(np.array(depth, dtype=np.int32)).long()
         if label is not None:
             label = torch.from_numpy(np.array(label, dtype=np.int32)).long()
-            return image, label
-        else:
-            return image
+        return returnValue(image=image, depth=depth, label=label)
+
 
 class Blur:
     def __init__(self):
         return
 
-    def __call__(self, image, label=None):
+    def __call__(self, image, depth=None, label=None):
         sigma = random.random()
         ksize = int(3.3 * sigma)
         ksize = ksize + 1 if ksize % 2 == 0 else ksize
         gaussian_blur = T.GaussianBlur(ksize, sigma)
         image = gaussian_blur(image)
-        if label is not None:
-            return image, label
-        else:
-            return image
+        return returnValue(image=image, depth=depth, label=label)
 
-class Resize():
+
+class Resize:
     def __init__(self, size=(512, 512), interpolation='LINEAR'):
-
-        interpolationDict = {
+        interpolation_dict = {
             'NEAREST': InterpolationMode.NEAREST,
             'LINEAR': InterpolationMode.BILINEAR,
             'CUBIC': InterpolationMode.BICUBIC,
             'LANCZOS': InterpolationMode.LANCZOS,
         }
-        self.interpolation = interpolationDict[interpolation];
+        self.interpolation = interpolation_dict[interpolation]
         if len(size) != 2:
             raise ValueError("Size invalid")
         self.resize = size
@@ -86,28 +120,27 @@ class HorizontalFlip:
         try:
             prob = float(prob)
         except:
-            print("The probability is not a float")
+            raise ValueError("The probability is not a float")
         self.prob = prob
         return
 
-    def __call__(self, image, label=None):
+    def __call__(self, image, label=None, depth=None):
         if random.random() > self.prob:
             image = hflip(image)
             if label is not None:
                 label = hflip(label)
-        return image, label
+            if depth is not None:
+                depth = hflip(depth)
+        return returnValue(image=image, depth=depth, label=label)
 
 
 class ColorJitter:
     def __init__(self, brightness, contrast, saturation):
         self.color_jitter = T.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation)
 
-    def __call__(self, image, label=None, *args, **kwargs):
+    def __call__(self, image, label=None, depth=None, *args, **kwargs):
         image = self.color_jitter(image)
-        if label is not None:
-            return image, label
-        else:
-            return image
+        return returnValue(image=image, depth=depth, label=label)
 
 
 class RandomScale:
@@ -117,7 +150,7 @@ class RandomScale:
         self.min = min
         self.max = max
 
-    def __call__(self, image, label, *args, **kwargs):
+    def __call__(self, image, label=None, depth=None, *args, **kwargs):
         w, h = image.size
         scale = random.uniform(self.min, self.max)
         w_new, h_new = int(w*scale), int(h*scale)
@@ -126,9 +159,10 @@ class RandomScale:
         if label is not None:
             lbl_resize = torchvision.transforms.Resize((w_new, h_new), InterpolationMode.NEAREST)
             label = lbl_resize(label)
-            return image, label
-        else:
-            return image
+        if depth is not None:
+            lbl_resize = torchvision.transforms.Resize((w_new, h_new), InterpolationMode.NEAREST)
+            depth = lbl_resize(depth)
+        return returnValue(image=image, depth=depth, label=label)
 
 
 class RandomCrop:
@@ -137,28 +171,28 @@ class RandomCrop:
             raise ValueError("Size invalid")
         self.cropSize = size
 
-    def __call__(self, image, label=None):
+    def __call__(self, image, label=None, depth=None):
         t, l, h, w = T.RandomCrop.get_params(image, output_size=self.cropSize)
         image = T.functional.crop(image, t, l, h, w)
+        if depth is not None:
+            depth = T.functional.crop(depth, t, l, h, w)
         if label is not None:
             label = T.functional.crop(label, t, l, h, w)
-            return image, label
-        else:
-            return image
+        return returnValue(image=image, depth=depth, label=label)
 
 
 class Rotate:
     def __init__(self,  angleMax=10):
         self.angleMax = angleMax
 
-    def __call__(self, image, label=None):
+    def __call__(self, image, label=None, depth=None):
         angle = random.randint(-self.angleMax, self.angleMax)
         image = rotate(image, angle=angle)
         if label is not None:
             label = rotate(label, angle=angle)
-            return image, label
-        else:
-            return image
+        if depth is not None:
+            depth = rotate(depth, angle=angle)
+        return returnValue(image=image, depth=depth, label=label)
 
 
 class Normalize:

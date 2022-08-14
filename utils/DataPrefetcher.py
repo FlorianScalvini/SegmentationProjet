@@ -12,6 +12,7 @@ class DataPrefetcher(object):
         self.stop_after = stop_after
         self.next_input = None
         self.next_target = None
+        self.next_depth = None
         self.device = device
 
     def __len__(self):
@@ -19,13 +20,16 @@ class DataPrefetcher(object):
 
     def preload(self):
         try:
-            self.next_input, self.next_target = next(self.loaditer)
+            self.next_input, self.next_depth, self.next_target = next(self.loaditer)
         except StopIteration:
             self.next_input = None
+            self.next_depth = None
             self.next_target = None
             return
         with torch.cuda.stream(self.stream):
             self.next_input = self.next_input.cuda(device=self.device, non_blocking=True)
+            if self.dataset.depth:
+                self.next_depth.cuda(device=self.device, non_blocking=True)
             self.next_target = self.next_target.cuda(device=self.device, non_blocking=True)
 
     def __iter__(self):
@@ -35,10 +39,13 @@ class DataPrefetcher(object):
         while self.next_input is not None:
             torch.cuda.current_stream().wait_stream(self.stream)
             input = self.next_input
+            depth = None
+            if self.next_depth is not None:
+                depth = self.next_depth
             target = self.next_target
             self.preload()
             count += 1
-            yield input, target
+            yield input, depth,target
             if type(self.stop_after) is int and (count > self.stop_after):
                 break
 

@@ -63,7 +63,7 @@ class Trainer():
             device = torch.device('cpu')
         return device
 
-    def _train_epoch(self, epoch=None, rgbd_train=False):
+    def _train_epoch(self, epoch=None):
         num_classes = self.model.num_classes
         self.model.train()
         total_loss = 0.0
@@ -77,7 +77,7 @@ class Trainer():
             self.optimizer.zero_grad()
             if self.scaler is not None:
                 with torch.cuda.amp.autocast():
-                    if rgbd_train:
+                    if self.model.depth:
                         preds = self.model(img, depth_img)
                     else:
                         preds = self.model(img)
@@ -88,7 +88,7 @@ class Trainer():
                 self.scaler.step(optimizer=self.optimizer)
                 self.scaler.update()
             else:
-                if rgbd_train:
+                if self.model.depth:
                     preds = self.model(img, depth_img)
                 else:
                     preds = self.model(img)

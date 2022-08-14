@@ -62,11 +62,10 @@ labels = [
 
 class Cityscapes(BaseDataSet):
     def __init__(self, transforms, root, split='train', depth=False, *args):
-        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms, labels=labels)
+        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms, labels=labels, depth=False)
         self.file_list = list()
         self.split = split.lower()
         self.ignore_index = 0
-        self.depth = depth
         img_dir = os.path.join(self.root, 'leftImg8bit')
         label_dir = os.path.join(self.root, 'gtFine')
         if self.root is None or not os.path.isdir(self.root) or not os.path.isdir(img_dir) \
@@ -85,21 +84,22 @@ class Cityscapes(BaseDataSet):
         if self.depth:
             depth_path = os.path.join(self.root, 'disparity', self.split)
             depth_paths = glob.glob(depth_path + '/**/*.png', recursive=True)
+            self.files = list(zip(image_paths, depth_paths, label_paths))
         else:
+            self.files = list(zip(image_paths, label_paths))
 
-            depth_paths = None
-        self.files = list(zip(image_paths, depth_paths, label_paths))
 
     def _load_data(self, index):
-        image_path, depth_label, label_path = self.files[index]
-        image = Image.open(image_path).convert('RGB')
-        label = Image.open(label_path)
 
         if self.depth:
+            image_path, depth_label, label_path = self.files[index]
             depth = Image.open(depth_label).convert("L")
-            return image, depth, label
         else:
-            return image, label
+            image_path, label_path = self.files[index]
+            depth = None
+        image = Image.open(image_path).convert('RGB')
+        label = Image.open(label_path)
+        return image, depth, label
 
 
 

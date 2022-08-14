@@ -29,7 +29,7 @@ def evaluate(model, eval_loader, num_classes, device, criterion=None, precision=
                         loss = criterion(preds, target)
                         total_loss += loss.sum()
             else:
-                if rgbd_eval:
+                if model.depth:
                     preds = model(img, depth_img)
                 else:
                     preds = model(img)
