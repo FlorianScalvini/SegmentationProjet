@@ -56,16 +56,14 @@ class BaseDataSet(Dataset):
 
     def __getitem__(self, index):
         image, depth, label = self._load_data(index)
-        if depth is None:
-            image, label = self.transforms(image=image, label=label, depth=None)
-            if self.mapping is not None:
-                label = self.encode_labels(label)
-            return [image], label.squeeze().long()
-        else:
-            image, depth, label = self.transforms(image=image, label=label, depth=depth)
-            if self.mapping is not None:
-                label = self.encode_labels(label)
+        image, depth, label = self.transforms(image=image, label=label, depth=depth)
+        if self.mapping is not None:
+            label = self.encode_labels(label)
+        if self.depth:
             return [image, depth], label.squeeze().long()
+        else:
+            return [image], label.squeeze().long()
+
 
     def encode_labels(self,mask):
         label_mask = torch.zeros_like(mask)

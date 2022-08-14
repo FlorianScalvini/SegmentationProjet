@@ -40,7 +40,7 @@ class Transform:
             self._addTotensor(self.trans_color)
         else:
             self.trans_color = []
-
+        self.tensor = ToTensor()
     @staticmethod
     def _addTotensor(transforms):
         for i in range(len(transforms)):
@@ -53,42 +53,42 @@ class Transform:
         return transforms
 
     def __call__(self, image, depth=None, label=None):
+        for transform in self.trans_commun:
+            image, depth, label = transform(image=image, depth=depth, label=label)
         if depth is not None:
             for transform in self.trans_commun:
-                image, depth, label = transform(image=image, depth=depth, label=label)
-            for transform in self.trans_depth:
                 depth = transform(image=depth)
-        else:
-            for transform in self.trans_commun:
-                image, label = transform(image=image, depth=None, label=label)
         for transform in self.trans_color:
-            image, label = transform(image=image, label=label)
-        return returnValue(image=image, label=label, depth=depth)
+            image = transform(image=image)
+        if label is not None:
+            label = self.tensor(label)
+        return image, depth, label
+
+
 
 class ToTensor:
     def __init__(self):
         self.toTensor = T.ToTensor()
 
-    def __call__(self, image, label=None, depth=None):
+    def __call__(self, image, label=None):
         image = self.toTensor(image)
-        if depth is not None:
-            depth = torch.from_numpy(np.array(depth, dtype=np.int32)).long()
         if label is not None:
             label = torch.from_numpy(np.array(label, dtype=np.int32)).long()
-        return returnValue(image=image, depth=depth, label=label)
+            return image, label
+        return image
 
 
 class Blur:
     def __init__(self):
         return
 
-    def __call__(self, image, depth=None, label=None):
+    def __call__(self, image):
         sigma = random.random()
         ksize = int(3.3 * sigma)
         ksize = ksize + 1 if ksize % 2 == 0 else ksize
         gaussian_blur = T.GaussianBlur(ksize, sigma)
         image = gaussian_blur(image)
-        return returnValue(image=image, depth=depth, label=label)
+        return image
 
 
 class Resize:
@@ -131,16 +131,17 @@ class HorizontalFlip:
                 label = hflip(label)
             if depth is not None:
                 depth = hflip(depth)
-        return returnValue(image=image, depth=depth, label=label)
+        return image, depth, label
 
 
 class ColorJitter:
     def __init__(self, brightness, contrast, saturation):
         self.color_jitter = T.ColorJitter(brightness=brightness, contrast=contrast, saturation=saturation)
 
-    def __call__(self, image, label=None, depth=None, *args, **kwargs):
+    def __call__(self, image):
         image = self.color_jitter(image)
-        return returnValue(image=image, depth=depth, label=label)
+        return image
+
 
 
 class RandomScale:
@@ -162,7 +163,7 @@ class RandomScale:
         if depth is not None:
             lbl_resize = torchvision.transforms.Resize((w_new, h_new), InterpolationMode.NEAREST)
             depth = lbl_resize(depth)
-        return returnValue(image=image, depth=depth, label=label)
+        return image, depth, label
 
 
 class RandomCrop:
@@ -178,7 +179,7 @@ class RandomCrop:
             depth = T.functional.crop(depth, t, l, h, w)
         if label is not None:
             label = T.functional.crop(label, t, l, h, w)
-        return returnValue(image=image, depth=depth, label=label)
+        return image, depth, label
 
 
 class Rotate:
@@ -192,7 +193,7 @@ class Rotate:
             label = rotate(label, angle=angle)
         if depth is not None:
             depth = rotate(depth, angle=angle)
-        return returnValue(image=image, depth=depth, label=label)
+        return image, depth, label
 
 
 class Normalize:
@@ -201,10 +202,7 @@ class Normalize:
         self.std = std
         self.toNormalize = T.Normalize(mean=self.mean, std=self.std)
 
-    def __call__(self, image, label=None):
+    def __call__(self, image):
         image = self.toNormalize(image)
-        if label is not None:
-            return image, label
-        else:
-            return image
+        return image
 
