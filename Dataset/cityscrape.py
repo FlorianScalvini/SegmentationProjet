@@ -62,7 +62,7 @@ labels = [
 
 class Cityscapes(BaseDataSet):
     def __init__(self, transforms, root, split='train', depth=False, *args):
-        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms, labels=labels, depth=False)
+        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms, labels=labels, depth=depth)
         self.file_list = list()
         self.split = split.lower()
         self.ignore_index = 0

@@ -71,16 +71,14 @@ class Trainer():
         pred_area = torch.zeros(num_classes).to(self.device)
         label_area = torch.zeros(num_classes).to(self.device)
         tbar = tqdm(self.train_loader, ncols=130, position=0, leave=True)
-        for batch_idx, (img, depth_img, target) in enumerate(tbar):
-            img = img.to(self.device)
-            target = target.to(self.device)
+        for batch_idx, (input, target) in enumerate(tbar):
             self.optimizer.zero_grad()
             if self.scaler is not None:
                 with torch.cuda.amp.autocast():
-                    if self.model.depth:
-                        preds = self.model(img, depth_img)
+                    if not self.model.depth:
+                        preds = self.model(input[0])
                     else:
-                        preds = self.model(img)
+                        preds = self.model(*input)
                     loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
                                             coef=self.lossCoef).sum()
                     loss = loss.sum()
@@ -88,10 +86,10 @@ class Trainer():
                 self.scaler.step(optimizer=self.optimizer)
                 self.scaler.update()
             else:
-                if self.model.depth:
-                    preds = self.model(img, depth_img)
+                if not self.model.depth:
+                    preds = self.model(input[0])
                 else:
-                    preds = self.model(img)
+                    preds = self.model(*input)
                 loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
                                         coef=self.lossCoef).sum()
                 loss.backward()

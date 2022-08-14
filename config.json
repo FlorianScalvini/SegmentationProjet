@@ -22,6 +22,7 @@
             "args": {
                 "root": "E:\\Dataset\\leftImg8bit_trainvaltest",
                 "split": "train",
+                "depth": true,
                 "transforms": {
                     "RandomScale": {
                         "min": 0.5,
@@ -56,6 +57,7 @@
             "args": {
                 "root": "E:\\Dataset\\leftImg8bit_trainvaltest",
                 "split": "val",
+                "depth": true,
                 "transforms": {
                     "commun": {
                         "Resize": [1024, 512]

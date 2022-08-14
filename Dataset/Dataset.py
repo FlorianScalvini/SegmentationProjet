@@ -32,7 +32,7 @@ def _label_metadata(labels):
 
 class BaseDataSet(Dataset):
     def __init__(self, root, num_classes, transforms=Transform(), depth=False, labels=None):
-        self.depth = False
+        self.depth = depth
         self.num_classes = num_classes
         self.root = root
         self.transforms = Transform(transforms=transforms)
@@ -57,11 +57,10 @@ class BaseDataSet(Dataset):
     def __getitem__(self, index):
         image, depth, label = self._load_data(index)
         if depth is None:
-            depth = torch.Tensor([])
             image, label = self.transforms(image=image, label=label, depth=None)
             if self.mapping is not None:
                 label = self.encode_labels(label)
-            return image, label.squeeze().long()
+            return [image], label.squeeze().long()
         else:
             image, depth, label = self.transforms(image=image, label=label, depth=depth)
             if self.mapping is not None:
