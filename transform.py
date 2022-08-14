@@ -40,7 +40,6 @@ class Transform:
             self._addTotensor(self.trans_color)
         else:
             self.trans_color = []
-        self.tensor = ToTensor()
     @staticmethod
     def _addTotensor(transforms):
         for i in range(len(transforms)):
@@ -56,12 +55,12 @@ class Transform:
         for transform in self.trans_commun:
             image, depth, label = transform(image=image, depth=depth, label=label)
         if depth is not None:
-            for transform in self.trans_commun:
+            for transform in self.trans_depth:
                 depth = transform(image=depth)
         for transform in self.trans_color:
             image = transform(image=image)
         if label is not None:
-            label = self.tensor(label)
+            label = torch.from_numpy(np.array(label, dtype=np.int32)).long()
         return image, depth, label
 
 
@@ -70,11 +69,8 @@ class ToTensor:
     def __init__(self):
         self.toTensor = T.ToTensor()
 
-    def __call__(self, image, label=None):
+    def __call__(self, image):
         image = self.toTensor(image)
-        if label is not None:
-            label = torch.from_numpy(np.array(label, dtype=np.int32)).long()
-            return image, label
         return image
 
 
