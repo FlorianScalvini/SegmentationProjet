@@ -125,7 +125,7 @@ class Trainer():
             log = {'epoch': epoch,
                    'train': train_log,
                    'val':  val_log}
-            print(f"Epoch :{epoch} \n Train : {log['train']['miou']} \n {log['val']['miou']}")
+            print(f"Epoch :{epoch} \n Train : {log['train']['miou']} \n Val : {log['val']['miou']}")
             self.improved = (val_log[self.metric] > self.mnt_best)
 
 
