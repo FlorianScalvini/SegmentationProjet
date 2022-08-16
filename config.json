@@ -101,7 +101,10 @@
 
     "lr_scheduler": {
         "type": "ReduceLROnPlateau",
-        "args": {}
+        "args": {
+            "factor": 0.9,
+            "patience" : 3
+        }
     },
 
     "trainer": {

@@ -98,6 +98,10 @@ class Trainer():
                                         coef=self.lossCoef).sum()
                 loss.backward()
                 total_loss += loss
+                if isinstance(self.optimizer, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                    self.optimizer.step(loss)
+                else:
+                    self.optimizer.step()
             if isinstance(preds, tuple) or isinstance(preds, list):
                 preds = preds[0]
             pred = torch.argmax(preds, dim=1, keepdim=True).squeeze()
@@ -126,7 +130,10 @@ class Trainer():
             val_log = evaluate(model=self.model, eval_loader=self.val_loader, device=self.device,
                                num_classes=self.val_loader.dataset.num_classes, criterion=self.criterion,
                                precision=self.precision, print_detail=False, ignore_labels=self.ignore_labels)
-            self.scheduler.step(val_log['loss'])
+            if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                self.scheduler.step(val_log['loss'])
+            else:
+                self.scheduler.step()
             log = {'epoch': epoch,
                    'train': train_log,
                    'val':  val_log}
