@@ -13,14 +13,14 @@ class CustomModel(BaseModel):
     def __init__(self, num_classes, width_seg=1.0, depth_seg=1.0, conv_out=128):
         super(CustomModel, self).__init__(num_classes=num_classes, depth=True)
         act_layer = partial(nn.ReLU, True)
-        C1, C2, C3, C4, C5, C6 = 16, 24, 40, 80, 112, conv_out
-        db_channels = (64, 64, conv_out)
+        C1, C2, C3, C4, C5 = 16, 32, 64, 128, conv_out
+        db_channels = (64, 64, C5)
 
         config_sb = [
             [C1, C2, 3, 6, 2],
-            [C2, C3, 5, 6, 2],
-            [C3, C4, 3, 6, 3],
-            [C4, C5, 5, 6, 3],
+            [C2, C3, 3, 6, 2],
+            [C3, C4, 3, 6, 2],
+            [C4, C5, 3, 6, 2],
         ]
 
         for idx in range(len(config_sb)):
@@ -32,14 +32,14 @@ class CustomModel(BaseModel):
 
         self.global_context = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
-            ConvBNActivation(in_channels=config_sb[-1][1], out_channels=C6, kernel_size=1, bias=False))
+            ConvBNActivation(in_channels=config_sb[-1][1], out_channels=C5, kernel_size=1, bias=False))
 
         self.db = DetailBranch(channel_stage=db_channels)
         self.sb = SemanticBranch(config=config_sb)
         self.conv1x1 = ConvBNActivation(in_channels=config_sb[-1][1], out_channels=conv_out, kernel_size=1, stride=1,
                                         activation=act_layer)
-        self.ffm = FeatureFusionModule(in_channels=conv_out*2, out_channels=C6)
-        self.head = SegHead(C6, C6, num_classes)
+        self.ffm = FeatureFusionModule(in_channels=conv_out*2, out_channels=conv_out)
+        self.head = SegHead(conv_out, conv_out, num_classes)
         self.aux_head1 = SegHead(C2, C2, num_classes)
         self.aux_head2 = SegHead(C3, C3, num_classes)
         self.aux_head3 = SegHead(C4, C4, num_classes)
@@ -68,7 +68,6 @@ class DetailBranch(nn.Module):
     def __init__(self, channel_stage, act_layer=partial(nn.SiLU, True)):
         super(DetailBranch, self).__init__()
         C1, C2, C3 = channel_stage
-
 
         self.b_color = nn.Sequential(
             ConvBNActivation(in_channels=3, out_channels=C1, kernel_size=3, stride=2, padding=1, activation=act_layer),
@@ -148,7 +147,7 @@ def _make_layer(config, id_stage_block, total_block_len, stoch_depth_prob=0.2):
 class SegHead(nn.Module):
     def __init__(self, in_dim, mid_dim, num_classes):
         super(SegHead, self).__init__()
-        self.conv1 = ConvBNRelu(in_channels=in_dim, out_channels=mid_dim, kernel_size=3, padding=0, bias=True, stride=1)
+        self.conv1 = ConvBNRelu(in_channels=in_dim, out_channels=mid_dim, kernel_size=3, padding=1, bias=True, stride=1)
         self.drop = nn.Dropout(0.1)
         self.conv2 = nn.Conv2d(in_channels=mid_dim, out_channels=num_classes, kernel_size=1, stride=1, padding=0,
                                bias=False)
@@ -218,10 +217,19 @@ if __name__ == "__main__":
     import torchvision.models
     mdl = CustomModel(num_classes=19, width_seg=1.0, depth_seg=1.0)
     mdl = mdl.cuda().eval()
-    torchsummary.summary(mdl, (3, 1024, 512))
-    from ptflops import get_model_complexity_info
-    macs, params = get_model_complexity_info(mdl, (3, 2048, 1024), as_strings=True,
-                                             print_per_layer_stat=True, verbose=True)
-    print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
-    print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+    input = torch.rand((1,3,1024,512)).cuda()
+    depth = torch.rand((1, 1,1024,512)).cuda()
+
+    start = torch.cuda.Event(enable_timing=True)
+    end = torch.cuda.Event(enable_timing=True)
+
+    start.record()
+    for i in range(1000):
+        rst = mdl(input, depth)
+    end.record()
+    # Waits for everything to finish running
+    torch.cuda.synchronize()
+
+    print(start.elapsed_time(end))
+
 

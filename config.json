@@ -47,7 +47,7 @@
         },
         "args": {
             "batch_size": 4,
-            "num_workers": 12
+            "num_workers": 14
         }
     },
     "val_loader": {
@@ -60,7 +60,7 @@
                 "depth": true,
                 "transforms": {
                     "commun": {
-                        "Resize": [1024, 512]
+                        "Resize": [512, 1024]
                     },
                     "depth":
                     {
@@ -69,8 +69,8 @@
                     "color": {
                         "Normalize":
                         {
-                            "mean": [0.3257, 0.3690, 0.3223],
-                            "std": [0.2112, 0.2148, 0.2115]
+                            "mean": [0.5, 0.3690, 0.3223],
+                            "std": [0.5, 0.5, 0.2115]
                         }
                     }
                 }

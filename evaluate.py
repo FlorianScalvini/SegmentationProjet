@@ -2,6 +2,7 @@ from tqdm import tqdm
 from utils.metric import *
 from utils.loss import loss_computation
 np.set_printoptions(suppress=True)
+import torch.nn as nn
 
 
 def evaluate(model, eval_loader, num_classes, device, criterion=None, precision='fp32', print_detail=True,
@@ -11,7 +12,7 @@ def evaluate(model, eval_loader, num_classes, device, criterion=None, precision=
     pred_area = torch.zeros(num_classes).to(device)
     label_area = torch.zeros(num_classes).to(device)
     tbar = tqdm(eval_loader, ncols=130, position=0, leave=True)
-
+    upscale = nn.Upsample(scale_factor=2, mode='nearest')
     total_loss = 0
     with torch.no_grad():
         for batch_idx, (input, target) in enumerate(tbar):
@@ -31,6 +32,7 @@ def evaluate(model, eval_loader, num_classes, device, criterion=None, precision=
                 else:
                     preds = model(*input)
                 if criterion is not None:
+                    preds = upscale(preds)
                     loss = criterion(preds, target)
                     total_loss += loss.sum()
             if isinstance(preds, tuple):

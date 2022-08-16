@@ -1,7 +1,10 @@
+import time
+
 from tqdm.auto import tqdm, trange
 import torch.utils.data
 from utils.metric import *
-from datetime import *
+import datetime
+import time
 from transform import *
 from utils.DataPrefetcher import DataPrefetcher
 from utils.loss import loss_computation
@@ -9,6 +12,7 @@ import os
 import logging
 from evaluate import evaluate
 import utils.helpers as helpers
+from torch.utils.tensorboard import SummaryWriter
 
 class Trainer():
     def __init__(self, model, loss, optimizer, scheduler, train_loader, lossCoef, val_loader=None,
@@ -34,7 +38,7 @@ class Trainer():
         self.device = self._get_available_devices(device)
         self.model.to(self.device)
         self.scaler = None
-        self.save_dir = save_dir + datetime.now().strftime("%m_%d-%H%M_%S") + "//"
+        self.save_dir = save_dir + datetime.datetime.now().strftime("%m_%d-%H%M_%S") + "//"
         helpers.create_path(self.save_dir)
 
         self.ignore_labels = 255
@@ -46,7 +50,7 @@ class Trainer():
         torch.backends.cudnn.benchmark = True
         self.train_loader = DataPrefetcher(train_loader, device=self.device)
         self.val_loader = DataPrefetcher(val_loader, device=self.device)
-        #writer = SummaryWriter()
+        self.writer = SummaryWriter(log_dir=self.save_dir+"//runs//")
 
     def _get_available_devices(self, device='gpu', n_gpu=0):
         if device == 'gpu':
@@ -102,6 +106,7 @@ class Trainer():
             pred_area = torch.add(pPred, pred_area)
             label_area = torch.add(pTarget, label_area)
 
+
         # RETURN LOSS & METRICS
         class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area)
         acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)
@@ -113,11 +118,10 @@ class Trainer():
         }
         return log
 
-
     def train(self):
         self.mnt_best = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
-            train_log = self._train_epoch()
+            torch.cuda.synchronize()
             val_log = evaluate(model=self.model, eval_loader=self.val_loader, device=self.device,
                                num_classes=self.val_loader.dataset.num_classes, criterion=self.criterion,
                                precision=self.precision, print_detail=False)
@@ -125,9 +129,13 @@ class Trainer():
             log = {'epoch': epoch,
                    'train': train_log,
                    'val':  val_log}
-            print(f"Epoch :{epoch} \n Train : {log['train']['miou']} \n Val : {log['val']['miou']}")
+            print(f"Epoch :{epoch} \n Train : {log['train']['miou']} {log['train']['loss']} \n Val : {log['val']['miou']} {log['val']['loss']}")
             self.improved = (val_log[self.metric] > self.mnt_best)
 
+            self.writer.add_scalar('Loss/train', log['train']['loss'], epoch)
+            self.writer.add_scalar('Loss/test', log['val']['loss'], epoch)
+            self.writer.add_scalar('Accuracy/train', log['train']['miou'], epoch)
+            self.writer.add_scalar('Accuracy/test', log['val']['miou'], epoch)
 
             if self.improved:
                 self.mnt_best = val_log[self.metric]
