@@ -24,23 +24,28 @@
                 "split": "train",
                 "depth": true,
                 "transforms": {
-                    "RandomScale": {
-                        "min": 0.5,
-                        "max": 2
+                    "commun": {
+                        "RandomScaleCrop": {
+                            "scale": [0.5, 2],
+                            "size": [512, 1024]
+                        },
+                        "Rotate": true,
+                        "HorizontalFlip": true
                     },
-                    "RandomCrop": [1024,512],
-                    "ColorJitter": {
-                        "brightness" : 0.5,
-                        "contrast" : 0.5,
-                        "saturation" : 0.5
+                    "depth" : {
+                        "Blur": true
                     },
-                    "Rotate": null,
-                    "HorizontalFlip": true,
-                    "Blur": null,
-                    "Normalize":
-                    {
-                        "mean": [0.3257, 0.3690, 0.3223],
-                        "std": [0.2112, 0.2148, 0.2115]
+                    "color": {
+                        "ColorJitter": {
+                            "brightness" : 0.5,
+                            "contrast" : 0.5,
+                            "saturation" : 0.5
+                        },
+                        "Normalize":
+                        {
+                            "mean": [0.5, 0.5, 0.5],
+                            "std": [0.5, 0.5, 0.5]
+                        }
                     }
                 }
             }

@@ -102,13 +102,11 @@ class Resize:
         self.resizeIm = T.Resize(self.resize, interpolation=InterpolationMode.BILINEAR)
         self.resizeLabel = T.Resize(self.resize, interpolation=InterpolationMode.NEAREST)
 
-    def __call__(self, image, label=None):
+    def __call__(self, image, label=None, depth=None):
         image = self.resizeIm(image)
-        if label is not None:
-            label = self.resizeLabel(label)
-            return image, label
-        else:
-            return image
+        if depth is not None:
+            depth = self.resizeIm(depth)
+        return image, depth, label
 
 
 class HorizontalFlip:
