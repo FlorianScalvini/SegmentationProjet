@@ -31,13 +31,14 @@ def _label_metadata(labels):
 
 
 class BaseDataSet(Dataset):
-    def __init__(self, root, num_classes, transforms=Transform(), depth=False, labels=None):
+    def __init__(self, root, num_classes, transforms=Transform(), depth=False, labels=None, ignore_label=None):
         self.depth = depth
         self.num_classes = num_classes
         self.root = root
         self.transforms = Transform(transforms=transforms)
         self.files = []
         self.palette = None
+        self.ignore_label = ignore_label
         if labels is not None:
             self.mapping = _label_metadata(labels)
         else:

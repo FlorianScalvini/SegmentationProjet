@@ -139,6 +139,38 @@ class ColorJitter:
         return image
 
 
+class RandomScaleCrop:
+    def __init__(self, scale=(0.5, 2), size=(512,512)):
+        if scale[0] > scale [1]:
+            raise ValueError("Maximum value is lower than minimun value")
+        self.min = scale[0]
+        self.max = scale[1]
+        self.cropSize = size
+
+    def __call__(self, image, label=None, depth=None, *args, **kwargs):
+        w, h = image.size
+        scale = random.uniform(self.min, self.max)
+        w_new, h_new = int(w * scale), int(h * scale)
+        if w_new < self.cropSize[1]:
+            w_new = self.cropSize[1]
+        if h_new < self.cropSize[0]:
+            h_new = self.cropSize[0]
+        img_resize = torchvision.transforms.Resize((h_new, w_new), InterpolationMode.BILINEAR)
+        image = img_resize(image)
+        t, l, h, w = T.RandomCrop.get_params(image, output_size=self.cropSize)
+        image = T.functional.crop(image, t, l, h, w)
+        if depth is not None:
+            depth = T.functional.crop(depth, t, l, h, w)
+        if label is not None:
+            lbl_resize = torchvision.transforms.Resize((h_new, w_new), InterpolationMode.NEAREST)
+            label = lbl_resize(label)
+            label = T.functional.crop(label, t, l, h, w)
+        if depth is not None:
+            lbl_resize = torchvision.transforms.Resize((h_new, w_new), InterpolationMode.NEAREST)
+            depth = lbl_resize(depth)
+            depth = T.functional.crop(depth, t, l, h, w)
+        return image, depth, label
+
 
 class RandomScale:
     def __init__(self, min=0.5, max=2):
@@ -146,6 +178,8 @@ class RandomScale:
             raise ValueError('RandomScale : Maximum value is lower than minimum value')
         self.min = min
         self.max = max
+        self.random_crop = RandomCrop()
+
 
     def __call__(self, image, label=None, depth=None, *args, **kwargs):
         w, h = image.size

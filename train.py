@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 class Trainer():
     def __init__(self, model, loss, optimizer, scheduler, train_loader, lossCoef, val_loader=None,
                  epochs=100, early_stopping=None, device='cpu', val_per_epochs=10,
-                 save_dir="./saved/", ignore_label=None, *args, **kwargs):
+                 save_dir="./saved/", ignore_label=255, *args, **kwargs):
 
         self.model = model
         self.criterion = loss
@@ -41,7 +41,7 @@ class Trainer():
         self.save_dir = save_dir + datetime.datetime.now().strftime("%m_%d-%H%M_%S") + "//"
         helpers.create_path(self.save_dir)
 
-        self.ignore_labels = 255
+        self.ignore_labels = ignore_label
         if self.device ==  torch.device('cpu'): prefetch = False
         self.precision = 'fp32'
         if self.precision == 'fp16':
@@ -122,9 +122,10 @@ class Trainer():
         self.mnt_best = 0
         for epoch in range(self.start_epoch, self.epochs + 1):
             torch.cuda.synchronize()
+            train_log = self._train_epoch(epoch=epoch)
             val_log = evaluate(model=self.model, eval_loader=self.val_loader, device=self.device,
                                num_classes=self.val_loader.dataset.num_classes, criterion=self.criterion,
-                               precision=self.precision, print_detail=False)
+                               precision=self.precision, print_detail=False, ignore_labels=self.ignore_labels)
             self.scheduler.step(val_log['loss'])
             log = {'epoch': epoch,
                    'train': train_log,

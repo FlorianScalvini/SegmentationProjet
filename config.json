@@ -86,7 +86,7 @@
         "type": "SGD",
         "differential_lr": true,
         "args":{
-            "lr": 0.01,
+            "lr": 0.05,
             "weight_decay": 5e-4
         }
     },
@@ -105,7 +105,7 @@
     },
 
     "trainer": {
-        "epochs": 80,
+        "epochs": 10000,
         "save_dir": ".//saved//",
         "save_period": 10,
         "monitor": "max Mean_IoU",
