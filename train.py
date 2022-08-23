@@ -140,6 +140,18 @@ class Trainer():
             print(f"Epoch :{epoch} \n Train : {log['train']['miou']} {log['train']['loss']} \n Val : {log['val']['miou']} {log['val']['loss']}")
             self.improved = (val_log[self.metric] > self.mnt_best)
 
+            dataiter = iter(self.train_loader)
+            images, labels = dataiter.next()
+            images = images[0].cuda()
+            preds = self.model(images)
+            preds = torch.argmax(preds, dim=1, keepdim=True).squeeze()
+            # show images
+            matplotlib_imshow(img_grid, one_channel=True)
+
+            # write to tensorboard
+            self.writer.add_image('four_fashion_mnist_images', img_grid)
+
+            self.writer.add_graph(self.model, images)
             self.writer.add_scalar('Loss/train', log['train']['loss'], epoch)
             self.writer.add_scalar('Loss/test', log['val']['loss'], epoch)
             self.writer.add_scalar('Accuracy/train', log['train']['miou'], epoch)
