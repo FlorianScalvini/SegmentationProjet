@@ -20,8 +20,8 @@
             "type": "Cityscapes",
             "split": "train",
             "args": {
-                "root": "E:\\Dataset\\leftImg8bit_trainvaltest",
-                "split": "train",
+                "root": "/home/florian/Bureau/leftImg8bit_trainvaltest",
+                "split": "val",
                 "depth": true,
                 "transforms": {
                     "commun": {
@@ -51,8 +51,8 @@
             }
         },
         "args": {
-            "batch_size": 6,
-            "num_workers": 14
+            "batch_size": 4,
+            "num_workers": 8
         }
     },
     "val_loader": {
@@ -60,7 +60,7 @@
         {
             "type": "Cityscapes",
             "args": {
-                "root": "E:\\Dataset\\leftImg8bit_trainvaltest",
+                "root": "/home/florian/Bureau/leftImg8bit_trainvaltest",
                 "split": "val",
                 "depth": true,
                 "transforms": {
@@ -82,8 +82,8 @@
             }
         },
         "args": {
-            "batch_size": 8,
-            "num_workers": 14
+            "batch_size": 4,
+            "num_workers": 6
         }
     },
 
