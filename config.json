@@ -98,7 +98,7 @@
 
     "loss" : {
         "type": "CrossEntropyLoss2d",
-        "coef" : [1,0.2,0.2,0.2,0.2],
+        "coef" : [1,0.3,0.2,0.1],
         "args": {
             "ignore_index": 255
         }
@@ -108,7 +108,7 @@
         "type": "ReduceLROnPlateau",
         "args": {
             "factor": 0.9,
-            "patience" : 3
+            "patience" : 10
         }
     },
 
@@ -123,5 +123,13 @@
         "log_per_iter": 20,
         "val": true,
         "val_per_epochs": 5
+    },
+
+
+    "test": {
+        "data": "",
+        "depth": null,
+        "path" : "",
+        "save" : ""
     }
 }

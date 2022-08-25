@@ -18,17 +18,23 @@ class Label:
         self.ignoreInEval = ignoreInEval
         self.color = color
 
-
-def _label_metadata(labels):
+def _label_metadata(labels, ignore_label=None):
     mapping = {}
+    palette = {}
+    mapping_inverse = {}
+    palette_inverse = {}
     if not isinstance(labels, list):
         raise ValueError('It is not a list')
     for label in labels:
         if not isinstance(label, Label):
             raise ValueError('It is not a list of Labels')
         mapping[label.id] = label.trainId
-    return mapping
+        palette[label.id] = label.color
+        if label.trainId != ignore_label:
+            mapping_inverse[label.trainId] = label.id
+            palette_inverse[label.trainId] = label.color
 
+    return mapping, palette, mapping_inverse, palette_inverse
 
 class BaseDataSet(Dataset):
     def __init__(self, root, num_classes, transforms=Transform(), depth=False, labels=None, ignore_label=None):
@@ -37,12 +43,16 @@ class BaseDataSet(Dataset):
         self.root = root
         self.transforms = Transform(transforms=transforms)
         self.files = []
+        self.palette_train = None
         self.palette = None
         self.ignore_label = ignore_label
         if labels is not None:
-            self.mapping = _label_metadata(labels)
+            self.mapping, self.palette, self.mapping_inverse, self.palette_inverse = _label_metadata(labels, ignore_label=ignore_label)
         else:
             self.mapping = None
+            self.palette = None
+            self.palette_inverse = None
+            self.mapping_inverse = None
         if self.transforms is None:
             raise ValueError("`transforms` is necessary, but it is None.")
 

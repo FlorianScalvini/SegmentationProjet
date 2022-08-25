@@ -111,4 +111,19 @@ class ConfigParser:
         dict_return["device"] = self.config['global']['device']
         return dict_return
 
-
+    def test_config(self):
+        dict_return = self.config['trainer']
+        kwargs_loader, dataset, kwargs_dataset = self.train_loader()
+        train_data = dataset(**kwargs_dataset)
+        if self.val:
+            kwargs_loader, dataset, kwargs_dataset = self.val_loader()
+            val_data = dataset(**kwargs_dataset)
+            val_loader = torch.utils.data.DataLoader(dataset=val_data, **kwargs_loader)
+            dict_return["val_loader"] = val_loader
+        mdl, kwargs = self.model()
+        if 'num_classes' != kwargs.keys():
+            kwargs["num_classes"] = train_data.num_classes
+        model = mdl(**kwargs)
+        dict_return["model"] = model
+        dict_return["device"] = self.config['global']['device']
+        return dict_return

@@ -129,7 +129,8 @@ class Trainer():
             train_log = self._train_epoch(epoch=epoch)
             val_log = evaluate(model=self.model, eval_loader=self.val_loader, device=self.device,
                                num_classes=self.val_loader.dataset.num_classes, criterion=self.criterion,
-                               precision=self.precision, print_detail=False, ignore_labels=self.ignore_labels)
+                               precision=self.precision, print_detail=False, ignore_labels=self.ignore_labels,
+                               palette=self.val_loader.dataset.palette_inverse)
             if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
                 self.scheduler.step(val_log['loss'])
             else:
@@ -140,22 +141,13 @@ class Trainer():
             print(f"Epoch :{epoch} \n Train : {log['train']['miou']} {log['train']['loss']} \n Val : {log['val']['miou']} {log['val']['loss']}")
             self.improved = (val_log[self.metric] > self.mnt_best)
 
-            dataiter = iter(self.train_loader)
-            images, labels = dataiter.next()
-            images = images[0].cuda()
-            preds = self.model(images)
-            preds = torch.argmax(preds, dim=1, keepdim=True).squeeze()
-            # show images
-            matplotlib_imshow(img_grid, one_channel=True)
 
-            # write to tensorboard
-            self.writer.add_image('four_fashion_mnist_images', img_grid)
-
-            self.writer.add_graph(self.model, images)
             self.writer.add_scalar('Loss/train', log['train']['loss'], epoch)
             self.writer.add_scalar('Loss/test', log['val']['loss'], epoch)
             self.writer.add_scalar('Accuracy/train', log['train']['miou'], epoch)
             self.writer.add_scalar('Accuracy/test', log['val']['miou'], epoch)
+            if "image" in log['val']:
+                self.writer.add_image(f'Image/validation/epoch_{epoch}', log['val']['image'], epoch)
 
             if self.improved:
                 self.mnt_best = val_log[self.metric]
@@ -176,6 +168,7 @@ class Trainer():
             'epoch': epoch,
             'state_dict': self.model.state_dict(),
             'optimizer': self.optimizer.state_dict(),
+            'scheduler' : self.scheduler.state_dict(),
             'monitor_best': self.mnt_best
         }
         filename = os.path.join(self.save_dir, f'checkpoint-epoch{epoch}.pth')
