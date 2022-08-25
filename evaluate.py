@@ -54,14 +54,11 @@ def evaluate(model, eval_loader, num_classes, device, criterion=None, precision=
             pred_area = torch.add(pPred, pred_area)
             label_area = torch.add(pTarget, label_area)
 
-            if len(val_visual) < nb_vizimg:
-                size = target.shape[-2:]
-                imgs = F.interpolate(input[0], size=size)
-                for i in range(imgs.shape[0]):
-                    if len(val_visual) >= nb_vizimg:
-                        break
-                    else:
-                        val_visual.append([imgs[i], pred[i], target[i]])
+            for i in range(target.shape[0]):
+                if len(val_visual) >= nb_vizimg:
+                    break
+                else:
+                    val_visual.append([pred[i], target[i]])
 
 
     class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area)
@@ -79,11 +76,11 @@ def evaluate(model, eval_loader, num_classes, device, criterion=None, precision=
     if len(val_visual) > 0:
         # WRTING & VISUALIZING THE MASKS
         val_img = []
-        for d, o, t in val_visual:
+        for o, t in val_visual:
             o = labeltoColor(label=o, color_map=palette, num_classes=num_classes, device=device).to('cpu')
             t = labeltoColor(label=t, color_map=palette, num_classes=num_classes, device=device).to('cpu')
-            val_img.extend([d.to('cpu'), t, o])
+            val_img.extend([t, o])
         val_img = torch.stack(val_img, 0)
-        val_img = make_grid(val_img.cpu(), nrow=3, padding=5)
+        val_img = make_grid(val_img.cpu(), nrow=2, padding=5)
         log['image'] = val_img
     return log

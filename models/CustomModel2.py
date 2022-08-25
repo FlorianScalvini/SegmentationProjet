@@ -198,7 +198,7 @@ class SpatialPath(nn.Module):
         )
 
         self.conv_1d = nn.Sequential(
-            ConvBNRelu(in_channels=3, out_channels=C1, kernel_size=3, stride=2, padding=1),
+            ConvBNRelu(in_channels=1, out_channels=C1, kernel_size=3, stride=2, padding=1),
             ConvBNRelu(in_channels=C1, out_channels=C1, kernel_size=3, padding=1)
         )
         self.conv_2d = nn.Sequential(
@@ -279,9 +279,8 @@ class SegHead(nn.Module):
 
 class CustomModel2(BaseModel):
     def __init__(self, num_classes):
-        super(CustomModel2, self).__init__(num_classes=num_classes)
+        super(CustomModel2, self).__init__(num_classes=num_classes, depth=True)
         C1, C2, C3 = 32, 64, 128
-
         self.spatialPath = SpatialPath(C1=C1, C2=C2, C3=C3)
         self.contextPath = ContextPath(in_channel=32, out_channels=128, config_vovnet=vovnet_19)
         self.dfm_8 = DecoderFusionModule(in_channels=128, out_channels=64)
@@ -292,8 +291,8 @@ class CustomModel2(BaseModel):
         self.seghead_16 = SegHead(in_dim=128, mid_dim=64, num_classes=num_classes)
         self.seghead_8 = SegHead(in_dim=256, mid_dim=64, num_classes=num_classes)
 
-    def forward(self, x):
-        y, spat_2, spat_4, spat_8 = self.spatialPath(x, x)
+    def forward(self, x, x1):
+        y, spat_2, spat_4, spat_8 = self.spatialPath(x, x1)
         if self.training:
             feat_4, feat_8, feat_16, feat_32 = self.contextPath(y)
         else:
