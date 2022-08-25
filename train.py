@@ -77,31 +77,15 @@ class Trainer():
         tbar = tqdm(self.train_loader, ncols=130, position=0, leave=True)
         for batch_idx, (input, target) in enumerate(tbar):
             self.optimizer.zero_grad()
-            if self.scaler is not None:
-                with torch.cuda.amp.autocast():
-                    if not self.model.depth:
-                        preds = self.model(input[0])
-                    else:
-                        preds = self.model(*input)
-                    loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
-                                            coef=self.lossCoef).sum()
-                    loss = loss.sum()
-                self.scaler.scale(loss).backward()
-                self.scaler.step(optimizer=self.optimizer)
-                self.scaler.update()
+            if not self.model.depth:
+                preds = self.model(input[0])
             else:
-                if not self.model.depth:
-                    preds = self.model(input[0])
-                else:
-                    preds = self.model(*input)
-                loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
-                                        coef=self.lossCoef).sum()
-                loss.backward()
-                total_loss += loss
-                if isinstance(self.optimizer, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                    self.optimizer.step(loss)
-                else:
-                    self.optimizer.step()
+                preds = self.model(*input)
+            loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
+                                    coef=self.lossCoef).sum()
+            loss.backward()
+            total_loss += loss
+            self.optimizer.step()
             if isinstance(preds, tuple) or isinstance(preds, list):
                 preds = preds[0]
             pred = torch.argmax(preds, dim=1, keepdim=True).squeeze()
