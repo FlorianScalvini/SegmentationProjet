@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 class Trainer():
     def __init__(self, model, loss, optimizer, scheduler, train_loader, lossCoef, val_loader=None,
                  epochs=100, early_stopping=None, device='cpu', val_per_epochs=10,
-                 save_dir="./saved/", ignore_label=255, *args, **kwargs):
+                 save_dir="./saved/", ignore_label=255, checkpoint=None, *args, **kwargs):
 
         self.model = model
         self.criterion = loss
@@ -38,9 +38,6 @@ class Trainer():
         self.device = self._get_available_devices(device)
         self.model.to(self.device)
         self.scaler = None
-        self.save_dir = save_dir + datetime.datetime.now().strftime("%m_%d-%H%M_%S") + "//"
-        helpers.create_path(self.save_dir)
-
         self.ignore_labels = ignore_label
         if self.device ==  torch.device('cpu'): prefetch = False
         self.precision = 'fp32'
@@ -50,6 +47,12 @@ class Trainer():
         torch.backends.cudnn.benchmark = True
         self.train_loader = DataPrefetcher(train_loader, device=self.device)
         self.val_loader = DataPrefetcher(val_loader, device=self.device)
+
+        if checkpoint is not None:
+            self._resume_checkpoint(checkpoint)
+        else:
+            self.save_dir = save_dir + datetime.datetime.now().strftime("%m_%d-%H%M_%S") + "//"
+            helpers.create_path(self.save_dir)
         self.writer = SummaryWriter(log_dir=self.save_dir+"//runs//")
 
     def _get_available_devices(self, device='gpu', n_gpu=0):
@@ -184,12 +187,12 @@ class Trainer():
     def _resume_checkpoint(self, resume_path):
         self.logger.info(f'Loading checkpoint : {resume_path}')
         checkpoint = torch.load(resume_path)
-
         # Load last run info, the model params, the optimizer and the loggers
         self.start_epoch = checkpoint['epoch'] + 1
         self.mnt_best = checkpoint['monitor_best']
         self.not_improved_count = 0
         self.model.load_state_dict(checkpoint['state_dict'])
         self.optimizer.load_state_dict(checkpoint['optimizer'])
-
+        self.scheduler.load_state_dict(checkpoint['scheduler'])
+        self.save_dir = resume_path.replace('/', "\\").rsplit("\\",1)[0] + "\\"
         print(f'Checkpoint <{resume_path}> (epoch {self.start_epoch}) was loaded')

@@ -5,6 +5,7 @@
         "val" :  true,
         "test" : false,
         "n_gpu": 1
+
     },
     "arch": {
         "type": "CustomModel2",
@@ -52,7 +53,7 @@
         },
         "args": {
             "batch_size": 6,
-            "num_workers": 14
+            "num_workers": 8
         }
     },
     "val_loader": {
@@ -82,8 +83,8 @@
             }
         },
         "args": {
-            "batch_size": 8,
-            "num_workers": 14
+            "batch_size": 6,
+            "num_workers": 8
         }
     },
 
@@ -122,7 +123,8 @@
         "log_dir": "saved\\runs",
         "log_per_iter": 20,
         "val": true,
-        "val_per_epochs": 5
+        "val_per_epochs": 5,
+        "checkpoint" : "C:\\Users\\Florian\\PycharmProjects\\SegmentationProjet\\saved\\08_26-0904_28\\checkpoint-epoch27.pth"
     },
 
 

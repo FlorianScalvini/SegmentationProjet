@@ -38,6 +38,7 @@ class ConfigParser:
             self.train = True if self.config["global"]['train'] else False
             self.val = True if self.config["global"]['val'] else False
             self.test = True if self.config["global"]['test'] else False
+
         except:
             raise ValueError("Missing information")
         return
