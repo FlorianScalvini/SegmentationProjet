@@ -81,10 +81,12 @@ class Cityscapes(BaseDataSet):
         assert os.listdir(image_path) == os.listdir(label_path)
         image_paths = glob.glob(image_path + '/**/*.png', recursive=True)
         label_paths = glob.glob(label_path + '/**/*gtFine_labelIds.png', recursive=True)
-
+        image_paths = sorted(image_paths)
+        label_paths = sorted(label_paths)
         if self.depth:
             depth_path = os.path.join(self.root, 'disparity', self.split)
             depth_paths = glob.glob(depth_path + '/**/*.png', recursive=True)
+            depth_paths = sorted(depth_paths)
             self.files = list(zip(image_paths, depth_paths, label_paths))
         else:
             self.files = list(zip(image_paths, label_paths))
