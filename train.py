@@ -133,6 +133,7 @@ class Trainer():
             self.writer.add_scalar('Loss/test', log['val']['loss'], epoch)
             self.writer.add_scalar('Accuracy/train', log['train']['miou'], epoch)
             self.writer.add_scalar('Accuracy/test', log['val']['miou'], epoch)
+            self.writer.add_scalar('Learning_Rate', self.scheduler.get_last_lr(), epoch)
             if "image" in log['val']:
                 self.writer.add_image(f'Image/validation/epoch_{epoch}', log['val']['image'], epoch)
 
@@ -146,8 +147,7 @@ class Trainer():
                     print('Training Stoped')
                     break
             # SAVE CHECKPOINT
-            if self.improved:
-                self._save_checkpoint(epoch, save_best=self.improved)
+            self._save_checkpoint(epoch, save_best=self.improved)
 
     def _save_checkpoint(self, epoch, save_best=False):
         state = {

@@ -11,12 +11,11 @@ class STDC(Backbone):
                  layers=None,
                  block_num=4,
                  type="cat",
-                 use_conv_last=False,
-                 pretrained=None):
+                 use_conv_last=False):
         super(Backbone, self).__init__()
         if layers is None:
             layers = [4, 5, 3]
-        self.pretrained = pretrained
+        self.feat_channels = [base // 2, base, base * 4, base * 8, base * 16]
         block = None
         if type == "cat":
             block = CatBottleneck

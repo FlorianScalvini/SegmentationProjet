@@ -18,66 +18,48 @@
     "train_loader": {
         "dataset" :
         {
-            "type": "Cityscapes",
-            "split": "train",
+            "type": "Mapillary",
             "args": {
-                "root": "E:\\Dataset\\leftImg8bit_trainvaltest",
+                "root": "E:\\Dataset\\Mapillary",
                 "split": "train",
-                "depth": true,
                 "transforms": {
-                    "commun": {
-                        "RandomScaleCrop": {
-                            "scale": [0.5, 2],
-                            "size": [512, 1024]
-                        },
-                        "Rotate": true,
-                        "HorizontalFlip": true
+                    "RandomScaleCrop": {
+                        "scale": [0.5, 2],
+                        "size": [512, 1024]
                     },
-                    "depth" : {
-                        "Blur": true
+                    "Rotate": true,
+                    "HorizontalFlip": true,
+                    "ColorJitter": {
+                        "brightness" : 0.2,
+                        "contrast" : 0.2,
+                        "saturation" : 0.2
                     },
-                    "color": {
-                        "ColorJitter": {
-                            "brightness" : 0.5,
-                            "contrast" : 0.5,
-                            "saturation" : 0.5
-                        },
-                        "Normalize":
-                        {
-                            "mean": [0.5, 0.5, 0.5],
-                            "std": [0.5, 0.5, 0.5]
-                        }
+                    "Normalize":
+                    {
+                        "mean": [0.5, 0.5, 0.5],
+                        "std": [0.5, 0.5, 0.5]
                     }
                 }
             }
         },
         "args": {
-            "batch_size": 6,
+            "batch_size": 4,
             "num_workers": 8
         }
     },
     "val_loader": {
         "dataset" :
         {
-            "type": "Cityscapes",
+            "type": "Mapillary",
             "args": {
-                "root": "E:\\Dataset\\leftImg8bit_trainvaltest",
+                "root": "E:\\Dataset\\Mapillary",
                 "split": "val",
-                "depth": true,
                 "transforms": {
-                    "commun": {
-                        "Resize": [512, 1024]
-                    },
-                    "depth":
+                    "Resize": [512, 1024],
+                    "Normalize":
                     {
-                        "Blur": true
-                    },
-                    "color": {
-                        "Normalize":
-                        {
-                            "mean": [0.5, 0.5, 0.5],
-                            "std": [0.5, 0.5, 0.5]
-                        }
+                        "mean": [0.5, 0.5, 0.5],
+                        "std": [0.5, 0.5, 0.5]
                     }
                 }
             }
@@ -99,7 +81,7 @@
 
     "loss" : {
         "type": "CrossEntropyLoss2d",
-        "coef" : [1,0.3,0.2,0.1],
+        "coef" : [1, 0.4, 0.2, 0.1],
         "args": {
             "ignore_index": 255
         }
@@ -108,7 +90,7 @@
     "lr_scheduler": {
         "type": "ReduceLROnPlateau",
         "args": {
-            "factor": 0.9,
+            "factor": 0.8,
             "patience" : 10
         }
     },
@@ -124,7 +106,7 @@
         "log_per_iter": 20,
         "val": true,
         "val_per_epochs": 5,
-        "checkpoint" : "C:\\Users\\Florian\\PycharmProjects\\SegmentationProjet\\saved\\08_26-0904_28\\checkpoint-epoch27.pth"
+        "checkpoint" : null
     },
 
 

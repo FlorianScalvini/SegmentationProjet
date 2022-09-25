@@ -220,6 +220,6 @@ class MBConvBlock(nn.Module):
 if __name__ == "__main__":
     import torchsummary
     import torchvision.models
-    mdl = EfficientNet(type="b4")
+    mdl = EfficientNet(type="v2_m")
     mdl = mdl.cuda()
-    torchsummary.summary(mdl, (3, 2048, 1024))
+    torchsummary.summary(mdl, (3, 1024, 512))

@@ -49,7 +49,7 @@ class PPLiteSeg(BaseModel):
         self.init_weight()
 
     def forward(self, x):
-        x_hw = x(x)[2:].shape
+        x_hw = x.shape[2:]
 
         feats_backbone = self.backbone(x)  # [x2, x4, x8, x16, x32]
         assert len(feats_backbone) >= len(self.backbone_indices), \
@@ -99,7 +99,8 @@ class PPLiteSegHead(nn.Module):
             low_chs = in_channels[i]
             high_ch = sppm_out_channel if i == len(in_channels) - 1 else uarm_channels[i + 1]
             out_ch = uarm_channels[i]
-            arm = UAFM(in_channels_Low=low_chs, in_channels_High=high_ch, out_channels=out_ch, kernel_size=3, am_type=am_type, resize_mode=resize_mode, avgMean=avgMean)
+            arm_module = getattr(models.module, arm_modes)
+            arm = arm_module(x_ch=low_chs, y_ch=high_ch, out_ch=out_ch, ksize=3, resize_mode=resize_mode)
             self.armList.append(arm)
 
     def forward(self, x):
@@ -132,7 +133,7 @@ class SPPM(nn.Module):
 
     def forward(self, x):
         out = None
-        input_shape = x[2:].shape
+        input_shape = x.shape[2:]
         for stage in self.stages:
             y = stage(input)
             y = nn.functional.interpolate(x, input_shape, mode="bilinear", align_corners=self.align_corners)

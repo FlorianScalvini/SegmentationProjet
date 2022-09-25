@@ -7,8 +7,8 @@ import models.backbone
 
 
 class STDCSeg(BaseModel):
-    def __init__(self, num_classes, backbone, pretrained=False,   use_boundary_2=False, use_boundary_4=False, use_boundary_8=False, use_boundary_16=False, use_conv_last=False, heat_map=False, *args, **kwargs):
-        super().__init__(num_classes=num_classes, pretrained=pretrained, backbone=backbone)
+    def __init__(self, num_classes, use_boundary_2=False, use_boundary_4=False, use_boundary_8=False, use_boundary_16=False, use_conv_last=False, heat_map=False, *args, **kwargs):
+        super().__init__(num_classes=num_classes)
         self.use_boundary_2 = use_boundary_2
         self.use_boundary_4 = use_boundary_4
         self.use_boundary_8 = use_boundary_8

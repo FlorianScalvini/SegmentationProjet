@@ -3,9 +3,34 @@ import torch.nn as nn
 from models.module import ConvBNRelu, ConvBN
 from models.backbone.Backbone import Backbone
 
+### Import necessary packages
+from torch import nn
+
+
+### Squeeze and Excitation Class definition
+class SE(nn.Module):
+    def __init__(self, channel, reduction_ratio=16):
+        super(SE, self).__init__()
+        ### Global Average Pooling
+        self.gap = nn.AdaptiveAvgPool2d(1)
+
+        ### Fully Connected Multi-Layer Perceptron (FC-MLP)
+        self.mlp = nn.Sequential(
+            nn.Linear(channel, channel // reduction_ratio, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction_ratio, channel, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.gap(x).view(b, c)
+        y = self.mlp(y).view(b, c, 1, 1)
+        return x * y.expand_as(x)
+
 class Resnet(Backbone):
     def __init__(self, block, layers=None, pretrained=False, num_classes=1000, groups=1, width_per_group=64,
-                 backbone=False):
+                 SE=False):
         super(Resnet, self).__init__()
         if layers is None:
             layers = [2, 2, 2, 2]
@@ -19,10 +44,10 @@ class Resnet(Backbone):
         self.groups = groups
         self.conv1 = ConvBNRelu(3, self.inplanes, kernel_size=7, padding=3, stride=2, bias=False)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 =  self._make_layer(block=block, planes=64, blocks=layers[0])
-        self.layer2 = self._make_layer(block=block, planes=128, blocks=layers[1], stride=2)
-        self.layer3 = self._make_layer(block=block, planes=256, blocks=layers[2], stride=2)
-        self.layer4 = self._make_layer(block=block, planes=512, blocks=layers[3], stride=2)
+        self.layer1 =  self._make_layer(block=block, planes=64, blocks=layers[0], SE=SE)
+        self.layer2 = self._make_layer(block=block, planes=128, blocks=layers[1], stride=2, SE=SE)
+        self.layer3 = self._make_layer(block=block, planes=256, blocks=layers[2], stride=2, SE=SE)
+        self.layer4 = self._make_layer(block=block, planes=512, blocks=layers[3], stride=2, SE=SE)
 
         self.Classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
@@ -55,7 +80,7 @@ class Resnet(Backbone):
                 elif isinstance(m, BasicBlock):
                     nn.init.constant_(m.bn2.weight, 0)  # type: ignore[arg-type]
 
-    def _make_layer(self, block, planes, blocks, stride=1, dilate=False):
+    def _make_layer(self, block, planes, blocks, stride=1, dilate=False, SE=False):
         downsample = None
         previous_dilation = self.dilation
         if dilate:
@@ -120,7 +145,7 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
     def __init__(self, in_channels, out_channels, stride=1, downsample=None, groups: int = 1,
-                 base_width: int = 64, dilation=1):
+                 base_width: int = 64, dilation=1, SE=False):
         super(Bottleneck, self).__init__()
         width = int(out_channels * (base_width / 64.0)) * groups
         norm_layer = nn.BatchNorm2d
@@ -150,10 +175,10 @@ def Resnet18(pretrained=False):
     return Resnet(block=BasicBlock, layers=[2,2,2,2],
                   pretrained=pretrained)
 
-def Resnet34(pretrained=False):
+def Resnet34(pretrained=False, SE=False):
     if pretrained:
         pretrained = "/Users/florianscalvini/PycharmProjects/SegmentationProjet/pretrained/resnet/resnet34.pth"
-    return Resnet(block=BasicBlock, layers=[3,4,6,3], pretrained=pretrained)
+    return Resnet(block=BasicBlock, layers=[3,4,6,3], pretrained=pretrained, SE=SE)
 
 def Resnet50(pretrained=False):
     if pretrained:

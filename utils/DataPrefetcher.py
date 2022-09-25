@@ -26,8 +26,7 @@ class DataPrefetcher(object):
             self.next_target = None
             return
         with torch.cuda.stream(self.stream):
-            for i in range(len(self.next_input)):
-                self.next_input[i] = self.next_input[i].cuda(device=self.device, non_blocking=True)
+            self.next_input = self.next_input.cuda(device=self.device, non_blocking=True)
             self.next_target = self.next_target.cuda(device=self.device, non_blocking=True)
 
     def __iter__(self):
