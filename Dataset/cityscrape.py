@@ -61,8 +61,8 @@ labels = [
 ]
 
 class Cityscapes(BaseDataSet):
-    def __init__(self, transforms, root, split='train', depth=False, *args):
-        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms, labels=labels, depth=depth,
+    def __init__(self, transforms, root, split='train', asLabel=True, *args):
+        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms, labels=labels, asLabel=asLabel,
                                          ignore_label=255)
         self.file_list = list()
         self.split = split.lower()
@@ -83,26 +83,14 @@ class Cityscapes(BaseDataSet):
         label_paths = glob.glob(label_path + '/**/*gtFine_labelIds.png', recursive=True)
         image_paths = sorted(image_paths)
         label_paths = sorted(label_paths)
-        if self.depth:
-            depth_path = os.path.join(self.root, 'disparity', self.split)
-            depth_paths = glob.glob(depth_path + '/**/*.png', recursive=True)
-            depth_paths = sorted(depth_paths)
-            self.files = list(zip(image_paths, depth_paths, label_paths))
-        else:
-            self.files = list(zip(image_paths, label_paths))
+        self.files = list(zip(image_paths, label_paths))
 
 
     def _load_data(self, index):
-
-        if self.depth:
-            image_path, depth_label, label_path = self.files[index]
-            depth = Image.open(depth_label).convert("L")
-        else:
-            image_path, label_path = self.files[index]
-            depth = None
+        image_path, label_path = self.files[index]
         image = Image.open(image_path).convert('RGB')
         label = Image.open(label_path)
-        return image, depth, label
+        return image, label
 
 
 

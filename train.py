@@ -80,10 +80,7 @@ class Trainer():
         tbar = tqdm(self.train_loader, ncols=130, position=0, leave=True)
         for batch_idx, (input, target) in enumerate(tbar):
             self.optimizer.zero_grad()
-            if not self.model.depth:
-                preds = self.model(input[0])
-            else:
-                preds = self.model(*input)
+            preds = self.model(input)
             loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
                                     coef=self.lossCoef).sum()
             loss.backward()

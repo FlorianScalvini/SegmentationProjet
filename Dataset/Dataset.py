@@ -37,8 +37,7 @@ def _label_metadata(labels, ignore_label=None):
     return mapping, palette, mapping_inverse, palette_inverse
 
 class BaseDataSet(Dataset):
-    def __init__(self, root, num_classes, transforms=Transform(), depth=False, labels=None, ignore_label=None):
-        self.depth = depth
+    def __init__(self, root, num_classes, transforms=None, labels=None, ignore_label=None, asLabel=True):
         self.num_classes = num_classes
         self.root = root
         self.transforms = Transform(transforms=transforms)
@@ -46,6 +45,7 @@ class BaseDataSet(Dataset):
         self.palette_train = None
         self.palette = None
         self.ignore_label = ignore_label
+        self.asLabel = asLabel
         if labels is not None:
             self.mapping, self.palette, self.mapping_inverse, self.palette_inverse = _label_metadata(labels, ignore_label=ignore_label)
         else:
@@ -66,14 +66,14 @@ class BaseDataSet(Dataset):
         return len(self.files)
 
     def __getitem__(self, index):
-        image, depth, label = self._load_data(index)
-        image, depth, label = self.transforms(image=image, label=label, depth=depth)
-        if self.mapping is not None:
-            label = self.encode_labels(label)
-        if self.depth:
-            return [image, depth], label.squeeze().long()
+        image, label = self._load_data(index)
+        image, label = self.transforms(image=image, label=label)
+        if self.asLabel:
+            if self.mapping is not None:
+                label = self.encode_labels(label)
+            return image, label.squeeze().long()
         else:
-            return [image], label.squeeze().long()
+            return image
 
 
     def encode_labels(self,mask):

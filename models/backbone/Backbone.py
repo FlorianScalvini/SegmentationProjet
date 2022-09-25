@@ -2,9 +2,6 @@ import torch.nn as nn
 import torch
 import math
 
-def test():
-    print("ffffff")
-
 class Backbone(nn.Module):
     def __init__(self, num_classes=1000):
         super(Backbone, self).__init__()

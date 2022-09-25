@@ -37,10 +37,7 @@ def evaluate(model, eval_loader, num_classes, device, criterion=None, precision=
                         loss = criterion(preds, target)
                         total_loss += loss.sum()
             else:
-                if not model.depth:
-                    preds = model(input[0])
-                else:
-                    preds = model(*input)
+                preds = model(input[0])
                 if criterion is not None:
                     size = target.shape[-2:]
                     preds = F.interpolate(preds, size=size)

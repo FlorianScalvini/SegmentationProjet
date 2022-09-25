@@ -8,10 +8,10 @@
 
     },
     "arch": {
-        "type": "CustomModel2",
+        "type": "PPLiteSeg",
         "pretrained": null,
         "args": {
-            "num_classes" : 19
+            "num_classes" : 3
         }
     },
 

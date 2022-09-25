@@ -11,20 +11,18 @@ import Dataset
 
 
 def _transform(transform_dict):
-    transform_parse = {"commun": [], "depth": [], "color": []}
-    for key in transform_parse.keys():
-        if key in transform_dict:
-            for key_fnc in transform_dict[key]:
-                value = transform_dict[key][key_fnc]
-                if value == False:
-                    continue
-                if value is True or value is None:
-                    transf = getattr(transform, key_fnc)()
-                elif isinstance(value, dict):
-                    transf = getattr(transform, key_fnc)(**value)
-                else:
-                    transf = getattr(transform, key_fnc)(value)
-                transform_parse[key].append(transf)
+    transform_parse = []
+    for key_fnc in transform_dict:
+        value = transform_dict[key_fnc]
+        if value == False:
+            continue
+        if value is True or value is None:
+            transf = getattr(transform, key_fnc)()
+        elif isinstance(value, dict):
+            transf = getattr(transform, key_fnc)(**value)
+        else:
+            transf = getattr(transform, key_fnc)(value)
+        transform_parse.append(transf)
     return transform_parse
 
 

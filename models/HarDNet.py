@@ -46,9 +46,8 @@ class HarDNet(BaseModel):
                  n_layers=(4, 4, 8, 8, 8),
                  align_corners=False,
                  pretrained=None):
-        super(HarDNet, self).__init__(num_classes=num_classes, backbone=None, pretrained=pretrained)
+        super(HarDNet, self).__init__(num_classes=num_classes)
         self.align_corners = align_corners
-        self.pretrained = pretrained
         encoder_blks_num = len(n_layers)
         decoder_blks_num = encoder_blks_num - 1
         encoder_in_channels = stem_channels[3]
@@ -74,7 +73,7 @@ class HarDNet(BaseModel):
         self.init_weight()
 
     def forward(self, x):
-        input_shape = paddle.shape(x)[2:]
+        input_shape = x.shape[2:]
         x = self.stem(x)
         x, skip_connections = self.encoder(x)
         x = self.decoder(x, skip_connections)
@@ -86,9 +85,6 @@ class HarDNet(BaseModel):
             align_corners=self.align_corners)
         return [logit]
 
-    def init_weight(self):
-        if self.pretrained is not None:
-            utils.load_entire_model(self, self.pretrained)
 
 
 class Encoder(nn.Module):
@@ -117,8 +113,7 @@ class Encoder(nn.Module):
             if i < n_blocks - 1:
                 self.shortcut_layers.append(len(self.blks) - 1)
             self.blks.append(
-                layers.ConvBNReLU(
-                    ch, ch_list[i], kernel_size=1, bias_attr=False))
+                ConvBNRelu(ch, ch_list[i], kernel_size=1, bias=False))
 
             ch = ch_list[i]
             if i < n_blocks - 1:
@@ -169,7 +164,7 @@ class Decoder(nn.Module):
         for i in range(n_blocks - 1, -1, -1):
             cur_channels_count = prev_block_channels + skip_connection_channels[
                 i]
-            conv1x1 = layers.ConvBNReLU(
+            conv1x1 = ConvBNRelu(
                 cur_channels_count,
                 cur_channels_count // 2,
                 kernel_size=1,
@@ -193,10 +188,10 @@ class Decoder(nn.Module):
             skip = skip_connections.pop()
             x = F.interpolate(
                 x,
-                size=paddle.shape(skip)[2:],
+                size=skip.shape[2:],
                 mode="bilinear",
                 align_corners=self.align_corners)
-            x = paddle.concat([x, skip], axis=1)
+            x = torch.cat([x, skip], axis=1)
             x = self.conv1x1_up[i](x)
             x = self.dense_blocks_up[i](x)
         return x
@@ -213,22 +208,18 @@ class HarDBlock(nn.Module):
         growth_rate (tuple|list): The growth rate.
         grmul (float): The channel multiplying factor.
         n_layers (tuple|list): The number of layers.
-        keepBase (bool, optional): A bool value indicates whether concatenating the first layer. Default: False.
     """
 
-    def __init__(self, channels, growth_rate, n_layers):
+    def __init__(self, base_channels, growth_rate, grmul, n_layers):
         super(HarDBlock, self).__init__()
         self.links = []
         layers_ = []
         self.out_channels = 0
         for i in range(n_layers):
-            outch, inch, link = get_link(i + 1, base_channels, growth_rate,
-                                         grmul)
-
+            outch, inch, link = get_link(i + 1, base_channels, growth_rate,grmul)
             self.links.append(link)
             layers_.append(
-                layers.ConvBNReLU(
-                    inch, outch, kernel_size=3, bias_attr=False))
+                ConvBNRelu(inch, outch, kernel_size=3, padding=1, bias=False))
             if (i % 2 == 0) or (i == n_layers - 1):
                 self.out_channels += outch
         self.layers = nn.LayerList(layers_)
@@ -241,7 +232,7 @@ class HarDBlock(nn.Module):
             for i in link:
                 tin.append(layers_[i])
             if len(tin) > 1:
-                x = paddle.concat(tin, axis=1)
+                x = torch.cat(tin, dim=1)
             else:
                 x = tin[0]
             out = self.layers[layer](x)
@@ -253,7 +244,7 @@ class HarDBlock(nn.Module):
             if (i == 0 and self.keepBase) or \
                 (i == t - 1) or (i % 2 == 1):
                 out_.append(layers_[i])
-        out = paddle.concat(out_, 1)
+        out = torch.cat(out_, 1)
 
         return out
 

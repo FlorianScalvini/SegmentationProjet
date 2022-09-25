@@ -1,35 +1,25 @@
 import models.BaseModel as BaseModel
+from models.backbone import *
 import torch.nn as nn
-import torch.nn.functional
-from models.module import *
+import models.module
 import models
-import torch
 
 
 class PPLiteSeg(BaseModel):
-    def __init__(self, num_classes, backbone, backbone_indices=None, arm_type='UAFM_SpAtten',cm_bin_sizes=None, cm_out_ch=128, arm_out_chs=None, seg_head_inter_chs=None, resize_mode='bilinear',pretrained=None, *args, **kwargs):
-        super(PPLiteSeg, self).__init__(backbone=backbone, num_classes=num_classes, pretrained=pretrained)
+    def __init__(self, num_classes, backbone="STDC2", arm_type='UAFM_SpAtten', cm_out_ch=128, resize_mode='bilinear', *args, **kwargs):
+        super(PPLiteSeg, self).__init__(num_classes=num_classes)
         # backbone
-        if seg_head_inter_chs is None:
+        if backbone == "STDC2":
+            self.backbone = STDC2()
             seg_head_inter_chs = [64, 64, 64]
-        if arm_out_chs is None:
             arm_out_chs = [64, 96, 128]
-        if cm_bin_sizes is None:
             cm_bin_sizes = [1, 2, 4]
-        if backbone_indices is None:
             backbone_indices = [2, 3, 4]
+        else:
+            raise NotImplementedError
 
-        assert hasattr(backbone, 'feat_channels'), \
-            "The backbone should has feat_channels."
-        assert len(backbone.feature_channels) >= len(backbone_indices), \
-            f"The length of input backbone_indices ({len(backbone_indices)}) should not be" \
-            f"greater than the length of feat_channels ({len(backbone.feat_channels)})."
-        assert len(backbone.feature_channels) > max(backbone_indices), \
-            f"The max value ({max(backbone_indices)}) of backbone_indices should be " \
-            f"less than the length of feat_channels ({len(backbone.feat_channels)})."
-        assert len(backbone_indices) > 1, "The lenght of backbone_indices should be greater than 1"
         self.backbone_indices = backbone_indices  # [..., x16_id, x32_id]
-        backbone_out_chs = [backbone.feat_channels[i] for i in backbone_indices]
+        backbone_out_chs = [self.backbone.feat_channels[i] for i in backbone_indices]
 
         # head
         if len(arm_out_chs) == 1:
@@ -81,23 +71,16 @@ class PPLiteSeg(BaseModel):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out')
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-        if self.pretrained is not None:
-            state_dict = torch.load(self.pretrained)["state_dict"]
-            self_state_dict = self.state_dict()
-            for k, v in state_dict.items():
-                self_state_dict.update({k: v})
-            self.load_state_dict(self_state_dict)
-
 
 class PPLiteSegHead(nn.Module):
 
-    def __init__(self, in_channels, uarm_channels, sppm_out_channel, sppm_sizes, am_type='channel', avgMean=True, resize_mode='bilinear'):
+    def __init__(self, in_channels, uarm_channels, cm_out_channel, cm_out_ch, arm_modes="UAFM", resize_mode='bilinear'):
         super().__init__()
-        self.sppm = SPPM(in_channels=in_channels[-1], out_channels=sppm_out_channel, inter_channels=sppm_out_channel, bin_sizes=sppm_sizes)
+        self.sppm = SPPM(in_channels=in_channels[-1], out_channels=cm_out_ch, inter_channels=cm_out_ch, bin_sizes=cm_out_channel)
         self.armList = nn.ModuleList()  # [..., arm8, arm16, arm32]
         for i in range(len(in_channels)):
             low_chs = in_channels[i]
-            high_ch = sppm_out_channel if i == len(in_channels) - 1 else uarm_channels[i + 1]
+            high_ch = cm_out_ch if i == len(in_channels) - 1 else uarm_channels[i + 1]
             out_ch = uarm_channels[i]
             arm_module = getattr(models.module, arm_modes)
             arm = arm_module(x_ch=low_chs, y_ch=high_ch, out_ch=out_ch, ksize=3, resize_mode=resize_mode)

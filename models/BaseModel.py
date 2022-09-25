@@ -7,15 +7,10 @@ from utils.torchsummary import summary
 import models.backbone
 
 class BaseModel(nn.Module):
-    def __init__(self, num_classes, pretrained=None, backbone=None, depth=False):
+    def __init__(self, num_classes):
         super(BaseModel, self).__init__()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.num_classes = num_classes
-        self.pretrained = pretrained
-        self.depth = depth
-
-        if backbone is not None:
-            self.backbone = backbone
 
 
     def forward(self, x):
@@ -32,3 +27,4 @@ class BaseModel(nn.Module):
     def unfreeze_bn(self):
         for module in self.modules():
             if isinstance(module, nn.BatchNorm2d): module.train()
+

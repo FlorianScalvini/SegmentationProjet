@@ -3,7 +3,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.module import *
+from models.module import ConvBNRelu, ConvBN
 from math import log
 
 class UAFM(nn.Module):
@@ -17,25 +17,119 @@ class UAFM(nn.Module):
         resize_mode (str, optional): The resize model in unsampling y tensor. Default: bilinear.
     """
 
-    def __init__(self, in_channels_Low, in_channels_High, out_channels, kernel_size=3, am_type="channel",resize_mode='bilinear', avgMean=True):
-        super(UAFM, self).__init__()
-        self.resize_mode = resize_mode
-        if am_type == "channel":
-            self.attenModule = ChannelAM(in_channels_High, avgMean)
-        elif am_type == "spatial":
-            self.attenModule = SpatialAM(avgMean)
-        else:
-            raise ValueError("Not implemented Attention Module type")
-        self.conv_low = ConvBNRelu(in_channels_Low, in_channels_High, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
-        self.conv_out = ConvBNRelu(in_channels_High, out_channels, kernel_size=kernel_size, padding=kernel_size // 2, bias=False)
+    def __init__(self, x_ch, y_ch, out_ch, ksize=3, resize_mode='nearest'):
+        super().__init__()
+
+        self.conv_x = ConvBNRelu(
+            x_ch, y_ch, kernel_size=ksize, padding=ksize // 2, bias=False)
+        self.conv_out = ConvBNRelu(
+            y_ch, out_ch, kernel_size=3, padding=1, bias=False)
         self.resize_mode = resize_mode
 
-    def forward(self, fLow, fHigh):
-        fLow = self.conv_low(fLow)
-        fUp = nn.functional.interpolate(fHigh, fLow[:2].shape, mode=self.resize_mode)
-        alpha = self.attenModule(fLow,fUp)
-        out = fUp * alpha + fLow *(1-alpha)
+    def check(self, x, y):
+        # print("x dim:",x.ndim)
+        assert x.ndim == 4 and y.ndim == 4
+        x_h, x_w = x.shape[2:]
+        y_h, y_w = y.shape[2:]
+        assert x_h >= y_h and x_w >= y_w
+
+    def prepare(self, x, y):
+        x = self.prepare_x(x, y)
+        y = self.prepare_y(x, y)
+        return x, y
+
+    def prepare_x(self, x, y):
+        x = self.conv_x(x)
+        return x
+
+    def prepare_y(self, x, y):
+        y_up = F.interpolate(y, x.shape[2:], mode=self.resize_mode)
+        return y_up
+
+    def fuse(self, x, y):
+        out = x + y
+        out = self.conv_out(out)
         return out
+
+    def forward(self, x, y):
+        """
+        Args:
+            x (Tensor): The low level feature.
+            y (Tensor): The high level feature.
+        """
+        # print("x,y shape:",x.shape, y.shape)
+        self.check(x, y)
+        x, y = self.prepare(x, y)
+        out = self.fuse(x, y)
+        return out
+
+class UAFM_SpAtten(UAFM):
+    """
+    The UAFM with spatial attention, which uses mean and max values.
+    Args:
+        x_ch (int): The channel of x tensor, which is the low level feature.
+        y_ch (int): The channel of y tensor, which is the high level feature.
+        out_ch (int): The channel of output tensor.
+        ksize (int, optional): The kernel size of the conv for x tensor. Default: 3.
+        resize_mode (str, optional): The resize model in unsampling y tensor. Default: bilinear.
+    """
+
+    def __init__(self, x_ch, y_ch, out_ch, ksize=3, resize_mode='nearest'):
+        super().__init__(x_ch, y_ch, out_ch, ksize, resize_mode)
+
+        self.conv_xy_atten = nn.Sequential(
+            ConvBNRelu(
+                4, 2, kernel_size=3, padding=1, bias=False),
+            ConvBN(
+                2, 1, kernel_size=3, padding=1, bias=False))
+
+    def fuse(self, x, y):
+        """
+        Args:
+            x (Tensor): The low level feature.
+            y (Tensor): The high level feature.
+        """
+        # print("x, y shape:",x.shape, y.shape)
+        atten = self.avg_max_reduce_channel([x, y])
+        atten = F.sigmoid(self.conv_xy_atten(atten))
+
+        out = x * atten + y * (1 - atten)
+        out = self.conv_out(out)
+        return out
+
+
+    def avg_max_reduce_channel_helper(self, x, use_concat=True):
+        # Reduce hw by avg and max, only support single input
+        assert not isinstance(x, (list, tuple))
+        # print("x before mean and max:", x.shape)
+        mean_value = torch.mean(x, dim=1, keepdim=True)
+        max_value = torch.max(x, dim=1, keepdim=True)[0]
+        # mean_value = mean_value.unsqueeze(0)
+        # print("mean max:", mean_value.shape, max_value.shape)
+
+        if use_concat:
+            res = torch.cat([mean_value, max_value], dim=1)
+        else:
+            res = [mean_value, max_value]
+        return res
+
+
+    def avg_max_reduce_channel(self, x):
+        # Reduce hw by avg and max
+        # Return cat([avg_ch_0, max_ch_0, avg_ch_1, max_ch_1, ...])
+        if not isinstance(x, (list, tuple)):
+            return self.avg_max_reduce_channel_helper(x)
+        elif len(x) == 1:
+            return self.avg_max_reduce_channel_helper(x[0])
+        else:
+            res = []
+            for xi in x:
+                # print(xi.shape)
+                res.extend(self.avg_max_reduce_channel_helper(xi, False))
+            # print("res:\n",)
+            # for it in res:
+            #     print(it.shape)
+            return torch.cat(res, dim=1)
 
 
 class ChannelAM(nn.Module):

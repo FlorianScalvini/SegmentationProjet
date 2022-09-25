@@ -32,7 +32,6 @@ class STDC(Backbone):
             self.x.append(nn.Sequential(self.features[idx:idx + i]))
             idx += i
         self.x.append(nn.Sequential(self.features[idx:]))
-        self.init_weight()
         return
 
     def forward(self, x):
@@ -159,3 +158,11 @@ class CatBottleneck(nn.Module):
         out_list.insert(0, out1)
         out = torch.cat(out_list, dim=1)
         return out
+
+def STDC1(**kwargs):
+    model = STDC(base=64, layers=[2, 2, 2], **kwargs)
+    return model
+
+def STDC2(**kwargs):
+    model = STDC(base=64, layers=[4, 5, 3], **kwargs)
+    return model

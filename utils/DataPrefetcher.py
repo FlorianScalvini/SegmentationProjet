@@ -12,7 +12,6 @@ class DataPrefetcher(object):
         self.stop_after = stop_after
         self.next_input = None
         self.next_target = None
-        self.next_depth = None
         self.device = device
 
     def __len__(self):
