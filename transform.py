@@ -71,7 +71,11 @@ class Resize:
 
     def __call__(self, image, label=None):
         image = self.resizeIm(image)
-        return image, label
+        if label is not None:
+            label = self.resizeLabel(label)
+            return image, label
+        else:
+            return image
 
 
 class HorizontalFlip:

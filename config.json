@@ -43,7 +43,7 @@
             }
         },
         "args": {
-            "batch_size": 4,
+            "batch_size": 16,
             "num_workers": 8
         }
     },
@@ -81,7 +81,7 @@
 
     "loss" : {
         "type": "CrossEntropyLoss2d",
-        "coef" : [1, 0.4, 0.2, 0.1],
+        "coef" : [1, 1, 1],
         "args": {
             "ignore_index": 255
         }

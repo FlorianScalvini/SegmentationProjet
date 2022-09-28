@@ -112,7 +112,7 @@ class Trainer():
             torch.cuda.synchronize()
             train_log = self._train_epoch(epoch=epoch)
             val_log = evaluate(model=self.model, eval_loader=self.val_loader, device=self.device,
-                               num_classes=self.val_loader.dataset.num_classes, criterion=self.criterion,
+                               num_classes=self.model.num_classes, criterion=self.criterion,
                                precision=self.precision, print_detail=False, ignore_labels=self.ignore_labels,
                                palette=self.val_loader.dataset.palette_inverse)
             if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
