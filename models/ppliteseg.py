@@ -118,8 +118,8 @@ class SPPM(nn.Module):
         out = None
         input_shape = x.shape[2:]
         for stage in self.stages:
-            y = stage(input)
-            y = nn.functional.interpolate(x, input_shape, mode="bilinear", align_corners=self.align_corners)
+            y = stage(x)
+            y = nn.functional.interpolate(y, input_shape, mode="bilinear", align_corners=self.align_corners)
             if out is None:
                 out = y
             else:

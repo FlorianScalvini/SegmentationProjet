@@ -10,8 +10,8 @@ class Transform:
     def __init__(self, transforms=None):
         if not isinstance(transforms, list):
             raise TypeError('The transforms must be a list!')
-        self.transforms = transforms
-        self._addTotensor(self.transforms)
+        self._addTotensor(transforms)
+        self.transforms = torchvision.transforms.Compose(transforms=transforms)
 
     @staticmethod
     def _addTotensor(transforms):
@@ -25,14 +25,12 @@ class Transform:
         return transforms
 
     def __call__(self, image, label=None):
-        for transform in self.transforms:
-            image, label = transform(image=image, label=label)
         if label is not None:
-            label = torch.from_numpy(np.array(label)).long()
-        return image, label
-
-
-
+            image, label = self.transforms(image, label)
+            return image, label
+        else:
+            image = self.transforms(image)
+            return image
 
 class ToTensor:
     def __init__(self):

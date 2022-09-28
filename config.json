@@ -25,7 +25,7 @@
                 "transforms": {
                     "RandomScaleCrop": {
                         "scale": [0.5, 2],
-                        "size": [512, 1024]
+                        "size": [480, 640]
                     },
                     "Rotate": true,
                     "HorizontalFlip": true,
@@ -53,9 +53,9 @@
             "type": "Mapillary",
             "args": {
                 "root": "E:\\Dataset\\Mapillary",
-                "split": "val",
+                "split": "validation",
                 "transforms": {
-                    "Resize": [512, 1024],
+                    "Resize": [480, 640],
                     "Normalize":
                     {
                         "mean": [0.5, 0.5, 0.5],
@@ -65,7 +65,7 @@
             }
         },
         "args": {
-            "batch_size": 6,
+            "batch_size": 16,
             "num_workers": 8
         }
     },
@@ -88,10 +88,10 @@
     },
 
     "lr_scheduler": {
-        "type": "ReduceLROnPlateau",
+        "type": "StepLR",
         "args": {
-            "factor": 0.8,
-            "patience" : 10
+            "gamma": 0.8,
+            "step_size" : 2
         }
     },
 

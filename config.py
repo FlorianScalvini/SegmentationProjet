@@ -91,7 +91,7 @@ class ConfigParser:
             val_loader = torch.utils.data.DataLoader(dataset=val_data, **kwargs_loader)
             dict_return["val_loader"] = val_loader
         mdl, kwargs = self.model()
-        if 'num_classes' != kwargs.keys():
+        if 'num_classes' not in kwargs.keys():
             kwargs["num_classes"] = train_data.num_classes
         model = mdl(**kwargs)
         dict_return["model"] = model
