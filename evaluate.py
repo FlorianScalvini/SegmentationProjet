@@ -71,8 +71,8 @@ def evaluate(model, eval_loader, num_classes, device, criterion=None, precision=
         # WRTING & VISUALIZING THE MASKS
         val_img = []
         for o, t in val_visual:
-            o = labeltoColor(label=o, color_map=palette, num_classes=num_classes, device=device).to('cpu')
-            t = labeltoColor(label=t, color_map=palette, num_classes=num_classes, device=device).to('cpu')
+            o = labeltoColor(label=o, color_map=palette, num_classes=num_classes).to('cpu')
+            t = labeltoColor(label=t, color_map=palette, num_classes=num_classes).to('cpu')
             val_img.extend([t, o])
         val_img = torch.stack(val_img, 0)
         val_img = make_grid(val_img.cpu(), nrow=2, padding=5)

@@ -82,3 +82,44 @@ if __name__ == "__main__":
         img, depth = transform(img, depth)
         pred = model(img, depth)
         pred = torchvision.utils.draw_segmentation_masks
+
+
+class CSPOSA_Module(nn.Module):
+    def __init__(self, in_channels, stage_ch, out_channels, first_stage_ch=None, identity=False, depthwise=False):
+        super(CSPOSA_Module, self).__init__()
+        self.identity = identity
+        self.layers = []
+        # feature aggregation
+        self.first_stage_ch = first_stage_ch
+        in_channel = in_channels
+        for i in range(2):
+            self.layers.append(ConvBNRelu(in_channels=in_channel, out_channels=stage_ch, kernel_size=3,
+                                          groups=1, padding=1, bias=False))
+            in_channel = stage_ch
+        in_channel = in_channels + 2 * stage_ch
+        if self.first_stage_ch is not None:
+            in_channel = in_channel + self.first_stage_ch
+        self.concat = ConvBNRelu(in_channels=in_channel, out_channels=out_channels, kernel_size=1, padding=0, stride=0,
+                                 bias=False)
+
+    def forward(self, x, x_first=None):
+        output = []
+        if self.first_stage_ch is not None:
+            output.append(x_first)
+        output.append(x)
+        identity_feat = x
+        for layer in self.layers:
+            x = layer(x)
+            output.append(x)
+        x = torch.cat(output, dim=1)
+        xt = self.concat(x)
+        if self.identity:
+            xt = xt + identity_feat
+        return xt
+
+
+class CSPOStage(nn.Module):
+    def __init__(self, in_channels, stage_ch, concat_ch):
+        super(CSPOStage, self).__init__()
+
+    def forward(self, x):

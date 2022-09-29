@@ -104,7 +104,7 @@ class PAPPM(nn.Module):
         self.shortcut = nn.Sequential(
             BatchNorm(in_channels, momentum=bn_mom),
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels, mid_channels, kernel_size=1, bias=False),
+            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
         )
 
     def forward(self, x):
@@ -139,20 +139,142 @@ class SegHead(nn.Module):
         return self.module(x)
 
 
-class CustomModel(BaseModel):
-    def __init__(self, num_classes):
-        super(CustomModel, self).__init__(num_classes=num_classes)
-        self.conv_1 = nn.Sequential(ConvBNRelu(in_channels=3, out_channels=64, kernel_size=3, stride=2, padding=1, bias=False),
-                                    ConvBNRelu(in_channels=64, out_channels=64, kernel_size=3, stride=2, padding=1, bias=False))
-        self.pappm = PAPPM(in_channels=128, mid_channels=128, out_channels=128)
-        self.iaff = iAFF(in_channels=128)
-        self.seghead = SegHead(in_channels=128, mid_channels=128, num_classes=num_classes)
+
+class OSA_module(nn.Module):
+    def __init__(
+        self, in_channels, stage_ch, out_channels, layer_per_block, identity=False, depthwise=False
+    ):
+
+        super(OSA_module, self).__init__()
+
+        self.identity = identity
+        self.depthwise = depthwise
+        self.isReduced = False
+        self.layers = nn.ModuleList()
+        in_channel = in_channels
+        if self.depthwise and in_channel != stage_ch:
+            self.isReduced = True
+            self.conv_reduction = ConvBNRelu(in_channels=in_channel, out_channels=stage_ch, kernel_size=1, padding=0, stride=1, bias=False)
+        for i in range(layer_per_block):
+            if self.depthwise:
+                self.layers.append(nn.Sequential(
+                    nn.Conv2d(in_channels=stage_ch, out_channels=stage_ch, kernel_size=3, padding=1, groups=stage_ch, bias=False),
+                    ConvBNRelu(in_channels=stage_ch, out_channels=stage_ch, padding=0, kernel_size=1,  bias=False)))
+            else:
+                self.layers.append(ConvBNRelu(in_channels=in_channel, out_channels=stage_ch, kernel_size=3, groups=1, padding=1, bias=False))
+            in_channel = stage_ch
+
+        # feature aggregation
+        in_channel = in_channels + layer_per_block * stage_ch
+        self.concat = ConvBNRelu(in_channels=in_channel, out_channels=out_channels, kernel_size=1, padding=0, stride=1, bias=False)
+
 
     def forward(self, x):
-        y = self.conv_1(x)
+
+        identity_feat = x
+        output = []
+        output.append(x)
+        if self.depthwise and self.isReduced:
+            x = self.conv_reduction(x)
+        for layer in self.layers:
+            x = layer(x)
+            output.append(x)
+        x = torch.cat(output, dim=1)
+        xt = self.concat(x)
+        if self.identity:
+            xt = xt + identity_feat
+
+        return xt
+
+
+
+
+class OSAStage(nn.Module):
+    def __init__( self, in_channels, stage_ch, concat_ch, block_per_stage, layer_per_block, depthwise=False):
+        super(OSAStage, self).__init__()
+        layers = []
+        layers.append(nn.Sequential(nn.MaxPool2d(kernel_size=3, stride=2, ceil_mode=True),
+                                    OSA_module(in_channels, stage_ch, concat_ch, layer_per_block,depthwise=depthwise)))
+        for i in range(block_per_stage - 1):
+            layers.append(OSA_module(concat_ch, stage_ch, concat_ch, layer_per_block, identity=True, depthwise=depthwise))
+
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.layers(x)
+
+
+class CustomModel(BaseModel):
+    def __init__(self, num_classes, planes=64,  ppm_planes=96, head_planes=128):
+        super(CustomModel, self).__init__(num_classes=num_classes)
+        self.layer_1 = nn.Sequential(ConvBNRelu(in_channels=3, out_channels=planes, kernel_size=3, stride=2, padding=1, bias=False),
+                                    ConvBNRelu(in_channels=planes, out_channels=planes, kernel_size=3, stride=2, padding=1, bias=False))
+
+        self.layer_2d = ConvBNRelu(in_channels=planes, out_channels=planes, kernel_size=3, padding=1, stride=2,
+                                   bias=False)
+        self.layer_3d = ConvBNRelu(in_channels=planes, out_channels=planes, kernel_size=3, padding=1, stride=1,
+                                   bias=False)
+        self.layer_4d = ConvBNRelu(in_channels=planes, out_channels=planes*2, kernel_size=3, padding=1, stride=1,
+                                   bias=False)
+
+        self.layer_2 = OSAStage(in_channels=64, stage_ch=64, concat_ch=128, block_per_stage=2, layer_per_block=3, depthwise=False)
+        self.layer_3 = OSAStage(in_channels=128, stage_ch=80, concat_ch=256, block_per_stage=2, layer_per_block=3, depthwise=False)
+        self.layer_4 = OSAStage(in_channels=256, stage_ch=96, concat_ch=384, block_per_stage=2, layer_per_block=3, depthwise=False)
+        self.layer_5 = OSAStage(in_channels=384, stage_ch=112, concat_ch=512, block_per_stage=3, layer_per_block=3, depthwise=False)
+        self.layer_6 = OSAStage(in_channels=512, stage_ch=128, concat_ch=planes*8, block_per_stage=3, layer_per_block=3, depthwise=False)
+
+        self.pappm = PAPPM(in_channels=planes*8, mid_channels=ppm_planes, out_channels=planes*2)
+        self.iaff = iAFF(in_channels=128)
+        self.seghead = SegHead(in_channels=128, mid_channels=head_planes, num_classes=num_classes)
+        self.seghead_d = SegHead(in_channels=128, mid_channels=head_planes, num_classes=num_classes)
+
+    def forward(self, x):
+        y = self.layer_1(x)
+        y_c = self.layer_2(y)
+        y_c = self.layer_3(y_c)
+        y_c = self.layer_4(y_c)
+        y_c = self.layer_5(y_c)
+        y_c = self.layer_6(y_c)
+        y_c = self.pappm(y_c)
+
+        y_d = self.layer_2d(y)
+        y_d = self.layer_3d(y_d)
+        y_d = self.layer_4d(y_d)
+        y_c = nn.functional.interpolate(y_c, y_d.shape[-2:], mode="bilinear", align_corners=False)
         y = self.iaff(y_c, y_d)
         y = self.seghead(y)
+        y = nn.functional.interpolate(y, x.shape[-2:], mode="bilinear", align_corners=False)
+        if self.training:
+            y_d = self.seghead_d(y_d)
+            y_d = nn.functional.interpolate(y_d, x.shape[-2:], mode="bilinear", align_corners=False)
+            return (y, y_d)
         return y
 
 
+if __name__ == "__main__":
+    import torchsummary
+    net = CustomModel(num_classes=19).cuda().eval()
+    import numpy as np
+    dummy_input = torch.randn(1, 3, 1024, 512, dtype=torch.float).cuda()
+    starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+    repetitions = 300
+    timings = np.zeros((repetitions, 1))
+    # GPU-WARM-UP
+    for _ in range(10):
+        _ = net(dummy_input)
+    # MEASURE PERFORMANCE
+    with torch.no_grad():
+        for rep in range(repetitions):
+            starter.record()
+            _ = net(dummy_input)
+            ender.record()
+            # WAIT FOR GPU SYNC
+            torch.cuda.synchronize()
+            curr_time = starter.elapsed_time(ender)
+            timings[rep] = curr_time
 
+
+    torchsummary.summary(net, (3, 1024, 512))
+    mean_syn = np.sum(timings) / repetitions
+    std_syn = np.std(timings)
+    print(mean_syn)

@@ -13,6 +13,8 @@ import logging
 from evaluate import evaluate
 import utils.helpers as helpers
 from torch.utils.tensorboard import SummaryWriter
+import utils.optim as optim
+
 
 class Trainer():
     def __init__(self, model, loss, optimizer, scheduler, train_loader, lossCoef, val_loader=None,
@@ -167,6 +169,7 @@ class Trainer():
     def _resume_checkpoint(self, resume_path):
         self.logger.info(f'Loading checkpoint : {resume_path}')
         checkpoint = torch.load(resume_path)
+
         # Load last run info, the model params, the optimizer and the loggers
         self.start_epoch = checkpoint['epoch'] + 1
         self.mnt_best = checkpoint['monitor_best']
