@@ -56,6 +56,9 @@ class Trainer():
             self.save_dir = save_dir + datetime.datetime.now().strftime("%m_%d-%H%M_%S") + "//"
             helpers.create_path(self.save_dir)
         self.writer = SummaryWriter(log_dir=self.save_dir+"//runs//")
+        self.total_batches = len(self.train_loader)
+        self.max_iter = epochs * self.total_batches
+        self.current_iteration = 0
 
     def _get_available_devices(self, device='gpu', n_gpu=0):
         if device == 'gpu':
@@ -81,6 +84,7 @@ class Trainer():
         label_area = torch.zeros(num_classes).to(self.device)
         tbar = tqdm(self.train_loader, ncols=130, position=0, leave=True)
         for batch_idx, (input, target) in enumerate(tbar):
+            self.current_iteration += 1
             self.optimizer.zero_grad()
             preds = self.model(input)
             loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
@@ -88,6 +92,8 @@ class Trainer():
             loss.backward()
             total_loss += loss
             self.optimizer.step()
+            self.writer.add_scalar('Iteration/Loss', loss, self.current_iteration)
+
             if isinstance(preds, tuple) or isinstance(preds, list):
                 preds = preds[0]
             pred = torch.argmax(preds, dim=1, keepdim=True).squeeze()
@@ -108,8 +114,15 @@ class Trainer():
         }
         return log
 
+    def get_lr(self):
+        for param_group in self.optimizer.param_groups:
+            return param_group['lr']
+
     def train(self):
         self.mnt_best = 0
+        self.current_iteration = 0
+        print("=====> the number of iterations per epoch: ", self.total_batches)
+
         for epoch in range(self.start_epoch, self.epochs + 1):
             torch.cuda.synchronize()
             train_log = self._train_epoch(epoch=epoch)
@@ -127,7 +140,7 @@ class Trainer():
             print(f"Epoch :{epoch} \n Train : {log['train']['miou']} {log['train']['loss']} \n Val : {log['val']['miou']} {log['val']['loss']}")
             self.improved = (val_log[self.metric] > self.mnt_best)
 
-
+            self.writer.add_scalar('LearningRate', self.get_lr(), epoch)
             self.writer.add_scalar('Loss/train', log['train']['loss'], epoch)
             self.writer.add_scalar('Loss/test', log['val']['loss'], epoch)
             self.writer.add_scalar('Accuracy/train', log['train']['miou'], epoch)

@@ -7,20 +7,15 @@ from torch.nn.modules.loss import _Loss, _WeightedLoss
 from torch.nn import NLLLoss2d
 
 
-__all__ = ["CrossEntropyLoss2d", "CrossEntropyLoss2dLabelSmooth",
-           "FocalLoss2d", "LDAMLoss", "ProbOhemCrossEntropy2d",
-           "LovaszSoftmax"]
 
-
-class CrossEntropyLoss2d(_WeightedLoss):
+class CrossEntropyLoss2d(nn.Module):
     """
     Standard pytorch weighted nn.CrossEntropyLoss
     """
 
-    def __init__(self, weight=None, ignore_label=255, reduction='mean'):
+    def __init__(self, weight=None, ignore_index=255, reduction='mean'):
         super(CrossEntropyLoss2d, self).__init__()
-
-        self.nll_loss = nn.CrossEntropyLoss(weight, ignore_index=ignore_label, reduction=reduction)
+        self.nll_loss = nn.CrossEntropyLoss(weight, ignore_index=ignore_index, reduction=reduction)
 
     def forward(self, output, target):
         """
@@ -63,10 +58,10 @@ class CrossEntropyLoss2dLabelSmooth(_WeightedLoss):
         N x C onehot smoothed vector
     """
 
-    def __init__(self, weight=None, ignore_label=255, epsilon=0.1, reduction='mean'):
+    def __init__(self, weight=None, ignore_index=255, epsilon=0.1, reduction='mean'):
         super(CrossEntropyLoss2dLabelSmooth, self).__init__()
         self.epsilon = epsilon
-        self.nll_loss = nn.CrossEntropyLoss(weight, ignore_index=ignore_label, reduction=reduction)
+        self.nll_loss = nn.CrossEntropyLoss(weight, ignore_index=ignore_index, reduction=reduction)
 
     def forward(self, output, target):
         """
@@ -121,6 +116,24 @@ class FocalLoss2d(nn.Module):
         else:
             return loss.sum()
 
+
+class OhemCELoss(nn.Module):
+    def __init__(self, thresh, n_min, ignore_lb=255, *args, **kwargs):
+        super(OhemCELoss, self).__init__()
+        self.thresh = -torch.log(torch.tensor(thresh, dtype=torch.float)).cuda()
+        self.n_min = n_min
+        self.ignore_lb = ignore_lb
+        self.criteria = nn.CrossEntropyLoss(ignore_index=ignore_lb, reduction='none')
+
+    def forward(self, logits, labels):
+        N, C, H, W = logits.size()
+        loss = self.criteria(logits, labels).view(-1)
+        loss, _ = torch.sort(loss, descending=True)
+        if loss[self.n_min] > self.thresh:
+            loss = loss[loss>self.thresh]
+        else:
+            loss = loss[:self.n_min]
+        return torch.mean(loss)
 
 """
 https://arxiv.org/pdf/1906.07413.pdf
@@ -277,6 +290,18 @@ class CrossEntropy2d(nn.Module):
 
 
 
+class SoftmaxFocalLoss(nn.Module):
+    def __init__(self, gamma, ignore_index=255, *args, **kwargs):
+        super(SoftmaxFocalLoss, self).__init__()
+        self.gamma = gamma
+        self.nll = nn.NLLLoss(ignore_index=ignore_index)
+
+    def forward(self, logits, labels):
+        scores = F.softmax(logits, dim=1)
+        factor = torch.pow(1.-scores, self.gamma)
+        log_score = F.log_softmax(logits, dim=1)
+        log_score = factor * log_score
+        loss = self.nll(log_score, labels)
 
 class LovaszSoftmax(nn.Module):
     def __init__(self, classes='present', per_image=False, ignore_index=255):

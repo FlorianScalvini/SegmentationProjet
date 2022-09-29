@@ -8,31 +8,31 @@
 
     },
     "arch": {
-        "type": "PPLiteSeg",
+        "type": "CustomModel",
         "pretrained": null,
         "args": {
-            "num_classes" : 3
+            "num_classes" : 19
         }
     },
 
     "train_loader": {
         "dataset" :
         {
-            "type": "Mapillary",
+            "type": "Cityscapes",
             "args": {
-                "root": "E:\\Dataset\\Mapillary",
+                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
                 "split": "train",
                 "transforms": {
                     "RandomScaleCrop": {
                         "scale": [0.5, 2],
-                        "size": [480, 640]
+                        "size": [512, 1024]
                     },
-                    "Rotate": true,
+                    "Rotate": false,
                     "HorizontalFlip": true,
                     "ColorJitter": {
-                        "brightness" : 0.2,
-                        "contrast" : 0.2,
-                        "saturation" : 0.2
+                        "brightness" : 0.5,
+                        "contrast" : 0.5,
+                        "saturation" : 0.5
                     },
                     "Normalize":
                     {
@@ -43,19 +43,19 @@
             }
         },
         "args": {
-            "batch_size": 16,
+            "batch_size": 4,
             "num_workers": 8
         }
     },
     "val_loader": {
         "dataset" :
         {
-            "type": "Mapillary",
+            "type": "Cityscapes",
             "args": {
-                "root": "E:\\Dataset\\Mapillary",
-                "split": "validation",
+                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
+                "split": "val",
                 "transforms": {
-                    "Resize": [480, 640],
+                    "Resize": [512, 1024],
                     "Normalize":
                     {
                         "mean": [0.5, 0.5, 0.5],
@@ -65,7 +65,7 @@
             }
         },
         "args": {
-            "batch_size": 16,
+            "batch_size": 4,
             "num_workers": 8
         }
     },
@@ -81,7 +81,7 @@
 
     "loss" : {
         "type": "CrossEntropyLoss2d",
-        "coef" : [1, 1, 1],
+        "coef" : [1, 1],
         "args": {
             "ignore_index": 255
         }
@@ -90,7 +90,7 @@
     "lr_scheduler": {
         "type": "StepLR",
         "args": {
-            "gamma": 0.8,
+            "gamma": 0.1,
             "step_size" : 2
         }
     },

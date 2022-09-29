@@ -257,7 +257,7 @@ if __name__ == "__main__":
     import numpy as np
     dummy_input = torch.randn(1, 3, 1024, 512, dtype=torch.float).cuda()
     starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-    repetitions = 300
+    repetitions = 3000
     timings = np.zeros((repetitions, 1))
     # GPU-WARM-UP
     for _ in range(10):

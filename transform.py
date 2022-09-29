@@ -11,7 +11,7 @@ class Transform:
         if not isinstance(transforms, list):
             raise TypeError('The transforms must be a list!')
         self._addTotensor(transforms)
-        self.transforms = torchvision.transforms.Compose(transforms=transforms)
+        self.transforms = transforms
 
     @staticmethod
     def _addTotensor(transforms):
@@ -25,12 +25,11 @@ class Transform:
         return transforms
 
     def __call__(self, image, label=None):
+        for transform in self.transforms:
+            image, label = transform(image=image, label=label)
         if label is not None:
-            image, label = self.transforms(image, label)
-            return image, label
-        else:
-            image = self.transforms(image)
-            return image
+            label = torch.from_numpy(np.array(label)).long()
+        return image, label
 
 class ToTensor:
     def __init__(self):
@@ -39,6 +38,7 @@ class ToTensor:
     def __call__(self, image, label):
         image = self.toTensor(image)
         return image, label
+
 
 
 class Blur:
@@ -73,9 +73,8 @@ class Resize:
         image = self.resizeIm(image)
         if label is not None:
             label = self.resizeLabel(label)
-            return image, label
-        else:
-            return image
+        return image, label
+
 
 
 class HorizontalFlip:
@@ -129,7 +128,6 @@ class RandomScaleCrop:
             label = lbl_resize(label)
             label = T.functional.crop(label, t, l, h, w)
         return image, label
-
 
 class RandomScale:
     def __init__(self, min=0.5, max=2):
@@ -187,4 +185,5 @@ class Normalize:
     def __call__(self, image, label=None):
         image = self.toNormalize(image)
         return image, label
+
 
