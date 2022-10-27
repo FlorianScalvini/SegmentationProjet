@@ -53,15 +53,15 @@ class ConfigParser:
         return lss, self.config['loss']['args'], self.config['loss']['coef']
 
     def optimizer_config(self):
-        if self.config['optimizer'] == 'Poly':
-            lambda1 = lambda epoch: math.pow((1 - (args.cur_iter / args.max_iter)), args.poly_exp)
-            scheduler = scheduler.LambdaLR(optimizer, lr_lambda=lambda1)
         optim = getattr(optimizer, self.config['optimizer']['type'])
         return optim, self.config['optimizer']['args']
 
     def scheduler(self):
-        schl = getattr(scheduler, self.config['lr_scheduler']['type'])
-        return schl, self.config['lr_scheduler']['args']
+        if self.config['lr_scheduler']['type'] is None:
+            return None, None,
+        else:
+            schl = getattr(scheduler, self.config['lr_scheduler']['type'])
+            return schl, self.config['lr_scheduler']['args']
 
     def train_loader(self):
         loader_config = self.config['train_loader']['args']
@@ -109,7 +109,8 @@ class ConfigParser:
         optim = optim(**kwargs)
         dict_return["optimizer"] = optim
         scheduler, kwargs = self.scheduler()
-        scheduler = scheduler(optimizer=optim, **kwargs)
+        if scheduler is not None:
+            scheduler = scheduler(optimizer=optim, **kwargs)
         dict_return["scheduler"] = scheduler
         dict_return["device"] = self.config['global']['device']
         return dict_return

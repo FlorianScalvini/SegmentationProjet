@@ -5,6 +5,77 @@ import torch.nn.functional as F
 from utils.losses.lovasz_losses import lovasz_softmax
 from torch.nn.modules.loss import _Loss, _WeightedLoss
 from torch.nn import NLLLoss2d
+import torch.cuda.amp as amp
+
+class LargeMarginSoftmaxFuncV2(torch.autograd.Function):
+
+    @staticmethod
+    @amp.custom_fwd(cast_inputs=torch.float32)
+    def forward(ctx, logits, labels, lam=0.3):
+        num_classes = logits.size(1)
+        coeff = 1. / (num_classes - 1.)
+        idx = torch.zeros_like(logits).scatter_(1, labels.unsqueeze(1), 1.)
+
+        lgts = logits.clone()
+        lgts[idx.bool()] = -1.e6
+        q = lgts.softmax(dim=1)
+        log_q = lgts.log_softmax(dim=1)
+        losses = q.sub_(coeff).mul_(log_q).mul_(lam / 2.)
+        losses[idx.bool()] = 0
+
+        losses = losses.sum(dim=1).add_(F.cross_entropy(logits, labels, reduction='none'))
+
+        ctx.variables = logits, labels, idx, coeff, lam
+        return losses
+
+    @staticmethod
+    @amp.custom_bwd
+    def backward(ctx, grad_output):
+        '''
+        compute gradient
+        '''
+        logits, labels, idx, coeff, lam = ctx.variables
+        num_classes = logits.size(1)
+
+        p = logits.softmax(dim=1)
+        lgts = logits.clone()
+        lgts[idx.bool()] = -1.e6
+        q = lgts.softmax(dim=1)
+        qx = q * lgts
+        qx[idx.bool()] = 0
+
+        grad = qx + q - q * qx.sum(dim=1).unsqueeze(1) - coeff
+        grad = grad * lam / 2.
+        grad[idx.bool()] = -1
+        grad = grad + p
+
+        grad.mul_(grad_output.unsqueeze(1))
+
+        return grad, None, None
+class OhemCELoss(nn.Module):
+    """
+    Online hard example mining cross-entropy loss: Online difficult sample mining
+    if loss[self.n_min] > self.thresh:  Least consideration  n_min  The one who lost the most  pixel,
+     If the former  n_min  The loss of the smallest of the losses is still greater than the set threshold ,
+     Then take all the actual elements greater than the threshold to calculate the loss :loss=loss[loss>thresh].
+     otherwise , Before calculation  n_min  A loss :loss = loss[:self.n_min]
+    """
+    def __init__(self, thresh=0.7, n_min=19200, ignore_lb=255, *args, **kwargs):
+        super(OhemCELoss, self).__init__()
+        self.thresh = -torch.log(torch.tensor(thresh, dtype=torch.float)).cuda()     #  The probability of entering   Convert to loss value
+        self.n_min = n_min
+        self.ignore_lb = ignore_lb
+        self.criteria = nn.CrossEntropyLoss(ignore_index=ignore_lb, reduction='none')   # Cross entropy
+
+    def forward(self, logits, labels):
+        N, C, H, W = logits.size()
+        loss = self.criteria(logits, labels).view(-1)
+        loss, _ = torch.sort(loss, descending=True)     #  Sort
+        if loss[self.n_min] > self.thresh:       #  When loss Greater than threshold ( Convert from input probability to loss threshold ) Pixel number ratio n_min a long time , Take the value greater than the threshold loss value
+            loss = loss[loss>self.thresh]
+        else:
+            loss = loss[:self.n_min]
+        return torch.mean(loss)
 
 
 

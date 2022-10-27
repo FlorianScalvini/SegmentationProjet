@@ -13,8 +13,7 @@ import logging
 from evaluate import evaluate
 import utils.helpers as helpers
 from torch.utils.tensorboard import SummaryWriter
-import utils.optim as optim
-
+from utils.optim import utils
 
 class Trainer():
     def __init__(self, model, loss, optimizer, scheduler, train_loader, lossCoef, val_loader=None,
@@ -75,6 +74,10 @@ class Trainer():
             device = torch.device('cpu')
         return device
 
+    def get_lr(self):
+        for param_group in self.optimizer.param_groups:
+            return param_group['lr']
+
     def _train_epoch(self, epoch=None):
         num_classes = self.model.num_classes
         self.model.train()
@@ -84,28 +87,28 @@ class Trainer():
         label_area = torch.zeros(num_classes).to(self.device)
         tbar = tqdm(self.train_loader, ncols=130, position=0, leave=True)
         for batch_idx, (input, target) in enumerate(tbar):
-            self.current_iteration += 1
             self.optimizer.zero_grad()
             preds = self.model(input)
-            loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion,
-                                    coef=self.lossCoef).sum()
+            loss = loss_computation(logits_list=preds, labels=target, criterion=self.criterion).sum()
             loss.backward()
             total_loss += loss
             self.optimizer.step()
-            self.writer.add_scalar('Iteration/Loss', loss, self.current_iteration)
-
             if isinstance(preds, tuple) or isinstance(preds, list):
                 preds = preds[0]
             pred = torch.argmax(preds, dim=1, keepdim=True).squeeze()
-            inter, pPred, pTarget = calculate_hist(pred, target, preds.shape[1], ignore_labels=self.ignore_labels)
+            inter, pPred, pTarget = calculate_area(pred, target, preds.shape[1], ignore_index=self.ignore_labels,
+                                                   device=self.device)
             intersect = torch.add(inter, intersect)
             pred_area = torch.add(pPred, pred_area)
             label_area = torch.add(pTarget, label_area)
 
 
         # RETURN LOSS & METRICS
-        class_iou, miou = meanIoU(aInter=intersect, aPreds=pred_area, aLabels=label_area)
-        acc, class_precision, class_recall = class_measurement(aInter=intersect, aPreds=pred_area, aLabels=label_area)
+
+        metrics_input = (intersect, pred_area, label_area)
+        class_iou, miou = mean_iou(*metrics_input)
+        acc, class_precision, class_recall = class_measurement(*metrics_input)
+
         log = {
             'loss': (total_loss / (len(self.train_loader) * self.train_loader.loader.batch_size)).item(),
             'miou': miou,
@@ -113,10 +116,6 @@ class Trainer():
             'class_precision': class_precision.cpu().numpy(),
         }
         return log
-
-    def get_lr(self):
-        for param_group in self.optimizer.param_groups:
-            return param_group['lr']
 
     def train(self):
         self.mnt_best = 0
@@ -127,7 +126,7 @@ class Trainer():
             torch.cuda.synchronize()
             train_log = self._train_epoch(epoch=epoch)
             val_log = evaluate(model=self.model, eval_loader=self.val_loader, device=self.device,
-                               num_classes=self.model.num_classes, criterion=self.criterion,
+                               num_classes=self.val_loader.dataset.num_classes, criterion=self.criterion,
                                precision=self.precision, print_detail=False, ignore_labels=self.ignore_labels,
                                palette=self.val_loader.dataset.palette_inverse)
             if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
@@ -139,12 +138,12 @@ class Trainer():
                    'val':  val_log}
             print(f"Epoch :{epoch} \n Train : {log['train']['miou']} {log['train']['loss']} \n Val : {log['val']['miou']} {log['val']['loss']}")
             self.improved = (val_log[self.metric] > self.mnt_best)
+            print(f"Epoch :{self.current_epoch} \n Train : {log['train']['miou']} {log['train']['loss']} \n Val : {log['val']['miou']} {log['val']['loss']}")
 
-            self.writer.add_scalar('LearningRate', self.get_lr(), epoch)
-            self.writer.add_scalar('Loss/train', log['train']['loss'], epoch)
-            self.writer.add_scalar('Loss/test', log['val']['loss'], epoch)
-            self.writer.add_scalar('Accuracy/train', log['train']['miou'], epoch)
-            self.writer.add_scalar('Accuracy/test', log['val']['miou'], epoch)
+            self.writer.add_scalar('Loss/train', log['train']['loss'], self.current_epoch)
+            self.writer.add_scalar('Loss/test', log['val']['loss'], self.current_epoch)
+            self.writer.add_scalar('Accuracy/train', log['train']['miou'], self.current_epoch)
+            self.writer.add_scalar('Accuracy/test', log['val']['miou'], self.current_epoch)
             if "image" in log['val']:
                 self.writer.add_image(f'Image/validation/epoch_{epoch}', log['val']['image'], epoch)
 
@@ -158,7 +157,9 @@ class Trainer():
                     print('Training Stoped')
                     break
             # SAVE CHECKPOINT
-            self._save_checkpoint(epoch, save_best=self.improved)
+            if self.improved:
+                self._save_checkpoint(self.current_epoch, save_best=self.improved)
+            self.current_epoch += 1
 
     def _save_checkpoint(self, epoch, save_best=False):
         state = {
@@ -182,7 +183,6 @@ class Trainer():
     def _resume_checkpoint(self, resume_path):
         self.logger.info(f'Loading checkpoint : {resume_path}')
         checkpoint = torch.load(resume_path)
-
         # Load last run info, the model params, the optimizer and the loggers
         self.start_epoch = checkpoint['epoch'] + 1
         self.mnt_best = checkpoint['monitor_best']

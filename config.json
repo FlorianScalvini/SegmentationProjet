@@ -8,24 +8,24 @@
 
     },
     "arch": {
-        "type": "CustomModel",
+        "type": "PPLiteSeg",
         "pretrained": null,
         "args": {
-            "num_classes" : 19
+            "num_classes" : 3
         }
     },
 
     "train_loader": {
         "dataset" :
         {
-            "type": "Cityscapes",
+            "type": "Mapillary",
             "args": {
-                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
-                "split": "train",
+                "root": "E:\\Dataset\\Mapillary\\",
+                "split": "training",
                 "transforms": {
                     "RandomScaleCrop": {
-                        "scale": [0.5, 2],
-                        "size": [512, 1024]
+                        "scale": [0.125, 2.0],
+                        "size": [480, 640]
                     },
                     "Rotate": false,
                     "HorizontalFlip": true,
@@ -36,36 +36,36 @@
                     },
                     "Normalize":
                     {
-                        "mean": [0.5, 0.5, 0.5],
-                        "std": [0.5, 0.5, 0.5]
+                        "mean": [0.485, 0.456, 0.406],
+                        "std": [0.229, 0.224, 0.225]
                     }
                 }
             }
         },
         "args": {
-            "batch_size": 4,
+            "batch_size": 16,
             "num_workers": 8
         }
     },
     "val_loader": {
         "dataset" :
         {
-            "type": "Cityscapes",
+            "type": "Mapillary",
             "args": {
-                "root": "/media/ubuntu/DATA/Database/leftImg8bit_trainvaltest/",
-                "split": "val",
+                "root": "E:\\Dataset\\\\Mapillary\\",
+                "split": "validation",
                 "transforms": {
-                    "Resize": [512, 1024],
+                    "Resize": [480, 640],
                     "Normalize":
                     {
-                        "mean": [0.5, 0.5, 0.5],
-                        "std": [0.5, 0.5, 0.5]
+                        "mean": [0.485, 0.456, 0.406],
+                        "std": [0.229, 0.224, 0.225]
                     }
                 }
             }
         },
         "args": {
-            "batch_size": 4,
+            "batch_size": 16,
             "num_workers": 8
         }
     },
@@ -79,24 +79,47 @@
         }
     },
 
-    "loss" : {
-        "type": "CrossEntropyLoss2d",
-        "coef" : [1, 1],
-        "args": {
-            "ignore_index": 255
+    "loss" : [
+        {
+            "type": "OhemCELoss",
+            "coef" : 1,
+            "args": {
+                "thresh": 0.7,
+                "n_min": 19200,
+                "ignore_lb": 255
+            }
+        },
+        {
+            "type": "OhemCELoss",
+            "coef" : 1,
+            "args": {
+                "thresh": 0.7,
+                "n_min": 19200,
+                "ignore_lb": 255
+            }
+        },
+        {
+            "type": "OhemCELoss",
+            "coef" : 1,
+            "args": {
+                "thresh": 0.7,
+                "n_min": 19200,
+                "ignore_lb": 255
+            }
         }
-    },
+    ],
+
 
     "lr_scheduler": {
-        "type": "StepLR",
+        "type": "PolynomialLR",
         "args": {
-            "gamma": 0.1,
-            "step_size" : 2
+            "total_iters": 100000,
+            "power" : 0.9
         }
     },
 
     "trainer": {
-        "epochs": 10000,
+        "iterations": 100000,
         "save_dir": ".//saved//",
         "save_period": 10,
         "monitor": "max Mean_IoU",

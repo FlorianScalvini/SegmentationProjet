@@ -61,12 +61,11 @@ labels = [
 ]
 
 class Cityscapes(BaseDataSet):
-    def __init__(self, transforms, root, split='train', asLabel=True, *args):
-        super(Cityscapes, self).__init__(root=root, num_classes=19, transforms=transforms, labels=labels, asLabel=asLabel,
+    def __init__(self, transforms, root, split='train', *args):
+        super(Cityscapes, self).__init__(root=root, num_classes=3, transforms=transforms, labels=labels,
                                          ignore_label=255)
         self.file_list = list()
         self.split = split.lower()
-        self.ignore_index = 0
         img_dir = os.path.join(self.root, 'leftImg8bit')
         label_dir = os.path.join(self.root, 'gtFine')
         if self.root is None or not os.path.isdir(self.root) or not os.path.isdir(img_dir) \
