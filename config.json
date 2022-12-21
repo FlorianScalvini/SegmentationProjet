@@ -11,21 +11,21 @@
         "type": "PPLiteSeg",
         "pretrained": null,
         "args": {
-            "num_classes" : 3
+            "num_classes" : 7
         }
     },
 
     "train_loader": {
         "dataset" :
         {
-            "type": "Mapillary",
+            "type": "Korean",
             "args": {
-                "root": "E:\\Dataset\\Mapillary\\",
-                "split": "training",
+                "root": "E:\\korea_blind\\segmentation",
+                "split": "train",
                 "transforms": {
                     "RandomScaleCrop": {
                         "scale": [0.125, 2.0],
-                        "size": [480, 640]
+                        "size": [360, 640]
                     },
                     "Rotate": false,
                     "HorizontalFlip": true,
@@ -36,36 +36,36 @@
                     },
                     "Normalize":
                     {
-                        "mean": [0.485, 0.456, 0.406],
-                        "std": [0.229, 0.224, 0.225]
+                        "mean": [0.5, 0.5, 0.5],
+                        "std": [0.5, 0.5, 0.5]
                     }
                 }
             }
         },
         "args": {
-            "batch_size": 16,
+            "batch_size": 32,
             "num_workers": 8
         }
     },
     "val_loader": {
         "dataset" :
         {
-            "type": "Mapillary",
+            "type": "Korean",
             "args": {
-                "root": "E:\\Dataset\\\\Mapillary\\",
-                "split": "validation",
+                "root": "E:\\korea_blind\\segmentation",
+                "split": "val",
                 "transforms": {
-                    "Resize": [480, 640],
+                    "Resize": [360, 640],
                     "Normalize":
                     {
-                        "mean": [0.485, 0.456, 0.406],
-                        "std": [0.229, 0.224, 0.225]
+                        "mean": [0.5, 0.5, 0.5],
+                        "std": [0.5, 0.5, 0.5]
                     }
                 }
             }
         },
         "args": {
-            "batch_size": 16,
+            "batch_size": 32,
             "num_workers": 8
         }
     },
@@ -119,7 +119,7 @@
     },
 
     "trainer": {
-        "iterations": 100000,
+        "iterations": 150000,
         "save_dir": ".//saved//",
         "save_period": 10,
         "monitor": "max Mean_IoU",
