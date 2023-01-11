@@ -172,30 +172,16 @@ class VovnetBackbone(nn.Module):
         return y_32, y_16, y_8
 
 
-class CustomModel(BaseModel):
+class Custom(BaseModel):
     def __init__(self, num_classes, planes=64,  ppm_planes=96, ppm_out_planes=128, head_planes=128, output_heads=[32, 64, 128]):
-        super(CustomModel, self).__init__(num_classes=num_classes)
-        cfg = [
-        # kernel size, inner channels, layer repeats, output channels, downsample
-            [3, 64, 3, 128, True],
-            [3, 80, 3, 256, True],
-            [3, 96, 3, 348, True],
-            [3, 112, 3, 512, True]
-        ]
-        self.backbone = VovnetBackbone(conf=cfg)
-        self.pappm = PAPPM(in_channels=cfg[-1][3], mid_channels=ppm_planes, out_channels=ppm_out_planes)
+        super(Custom, self).__init__(num_classes=num_classes)
+        self.conv_x = nn.Sequential(ConvBNRelu(in_channels=3, out_channels=32, stride=2, padding=1),
+                                    ConvBNRelu(in_channels=32, out_channels=32, stride=1, padding=1))
+        self.conv_0 = nn.Sequential(ConvBNRelu(in_channels=32, out_channels=32, stride=1, padding=1))
+        self.conv_1 = nn.Sequential(ConvBNRelu(in_channels=32, out_channels=32, stride=1, padding=1))
+        self.conv_2 = nn.Sequential(ConvBNRelu(in_channels=32, out_channels=64, stride=1, padding=1))
 
-        self.arm_list = nn.ModuleList([
-            FusionAttentionModule(x_high_channels=ppm_out_planes, x_low_channels=cfg[-1][3], out_channels=output_heads[0]),
-            FusionAttentionModule(x_high_channels=output_heads[0], x_low_channels=cfg[-2][3], out_channels=output_heads[1]),
-            FusionAttentionModule(x_high_channels=output_heads[1], x_low_channels=cfg[-3][3], out_channels=output_heads[2])
-        ])
 
-        self.seghead = nn.ModuleList([
-            SegHead(in_channels=output_heads[2], mid_channels=head_planes, num_classes=num_classes),
-            SegHead(in_channels=output_heads[1], mid_channels=head_planes, num_classes=num_classes),
-            SegHead(in_channels=output_heads[0], mid_channels=head_planes, num_classes=num_classes)
-        ])
 
     def forward(self, x):
         backbone = self.backbone(x)
@@ -218,9 +204,125 @@ class CustomModel(BaseModel):
             return y
 
 
+class FusedMBConv(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, expand_ratio, stride, stoch_depth_prob=0.2):
+        super().__init__()
+        if not (1 <= stride <= 2):
+            raise ValueError("illegal stride value")
+
+        self.use_res_connect = stride == 1 and in_channels == out_channels
+
+        layers = []
+        activation_layer = nn.SiLU
+
+        expanded_channels = makeChl(channels=in_channels, expand_ratio=expand_ratio)
+        if expanded_channels != in_channels:
+            # fused expand
+            layers.append(
+                ConvBNActivation(
+                    in_channels,
+                    expanded_channels,
+                    kernel_size=kernel_size,
+                    stride=stride,
+                    activation=activation_layer,
+                    padding=(kernel_size - 1) // 2,
+                )
+            )
+            # project
+            layers.append(
+                ConvBNActivation(expanded_channels, out_channels, kernel_size=1, activation=None, padding=0))
+        else:
+            layers.append(
+                ConvBNActivation(
+                    in_channels,
+                    out_channels,
+                    kernel_size=kernel_size,
+                    stride=stride,
+                    activation=activation_layer,
+                    padding=(kernel_size - 1) // 2
+                )
+            )
+
+        self.block = nn.Sequential(*layers)
+        self.stochastic_depth = StochasticDepth(stoch_depth_prob, "row")
+        self.out_channels = out_channels
+
+    def forward(self, input):
+        result = self.block(input)
+        if self.use_res_connect:
+            result = self.stochastic_depth(result)
+            result += input
+        return result
+
+def makeChl(channels, expand_ratio, min_channels=None):
+    if min_channels is None:
+        min_channels = channels
+    else:
+        min_channels = min(channels, min_channels)
+    return max(min_channels, int(channels * expand_ratio))
+
+class MBConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, expand_ratio, stride, kernel_size, stoch_depth_prob=0.2):
+        super(MBConvBlock, self).__init__()
+        if not (1 <= stride <= 2):
+            raise ValueError("illegal stride value")
+
+        self.use_res_connect = stride == 1 and in_channels == out_channels
+
+        layers = []
+        activation_layer = nn.SiLU
+
+        # expand
+        expanded_channels = makeChl(in_channels, expand_ratio)
+        if expanded_channels != in_channels:
+            layers.append(
+                ConvBNActivation(
+                    in_channels,
+                    expanded_channels,
+                    kernel_size=1,
+                    padding=0,
+                    activation=activation_layer,
+                )
+            )
+
+        # depthwise
+        layers.append(
+            ConvBNActivation(
+                expanded_channels,
+                expanded_channels,
+                kernel_size=kernel_size,
+                stride=stride,
+                groups=expanded_channels,
+                padding=(kernel_size - 1) // 2,
+                activation=activation_layer
+            )
+        )
+
+        # squeeze and excitation
+        squeeze_channels = max(1, in_channels // 4)
+        layers.append(SqueezeExcitation(expanded_channels, squeeze_channels, activation=partial(nn.SiLU, inplace=True)))
+
+        # project
+        layers.append(
+            ConvBNActivation(
+                expanded_channels, out_channels, kernel_size=1,  padding=0, activation=None
+            )
+        )
+
+        self.block = nn.Sequential(*layers)
+        self.stochastic_depth = StochasticDepth(stoch_depth_prob, "row")
+        self.out_channels = out_channels
+
+    def forward(self, input):
+        result = self.block(input)
+        if self.use_res_connect:
+            result = self.stochastic_depth(result)
+            result += input
+        return result
+
 if __name__ == "__main__":
     import torchsummary
-    net = CustomModel(num_classes=19).cuda().eval()
+    net = Custom(num_classes=19).cuda().eval()
     import numpy as np
     dummy_input = torch.randn(1, 3, 1024, 512, dtype=torch.float).cuda()
     starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
